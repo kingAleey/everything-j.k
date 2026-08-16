@@ -150,7 +150,7 @@
   }
   async function deleteProduct(id){if(!confirm("Delete this product permanently?"))return;var p=STORE.products.find(function(x){return x.id===id;});var r=await sb.from("products").delete().eq("id",id);if(r.error){toast("Delete failed: "+r.error.message,true);return;}if(p&&p.image&&p.image.indexOf("/storage/v1/object/public/jk-assets/")>-1){try{var path=p.image.split("/jk-assets/")[1];await sb.storage.from("jk-assets").remove([path]);}catch(e){}}if(editingId===id)resetForm();await loadData();renderList();toast("🗑 Product deleted globally.");}
 
-  function setLogo(src){currentLogo=src||"";if(currentLogo){$("sLogoPreview").src=currentLogo;$("sLogoPreview").classList.remove("hidden");$("logoPh").classList.add("hidden");}else{$("sLogoPreview").classList.add("hidden");$("logoPh").classList.remove("hidden");}}
+  function setLogo(src){var preview=$("sLogoPreview");currentLogo=src||"";if(currentLogo){preview.src=currentLogo;preview.style.width="120px";preview.style.height="120px";preview.style.borderRadius="50%";preview.style.objectFit="cover";preview.style.display="block";preview.style.margin="0 auto";preview.classList.remove("hidden");$("logoPh").classList.add("hidden");}else{preview.classList.add("hidden");preview.style.display="none";$("logoPh").classList.remove("hidden");}}
   async function handleLogoFile(file){
     if(!file || !file.type || file.type.indexOf("image/") !== 0){toast("Please choose an image file.",true);return;}
     if(file.size > 12*1024*1024){toast("Please choose a logo smaller than 12MB.",true);return;}
