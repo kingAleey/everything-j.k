@@ -14,7 +14,7 @@
   function fmt(n){return "₦"+Number(n||0).toLocaleString("en-NG");}
   function priceLabel(p){if(!p.price)return '<span class="price-on-dm">PRICE ON DM 💬</span>';return '<span class="price">'+fmt(p.price)+'</span>'+(p.oldPrice?'<span class="old-price">'+fmt(p.oldPrice)+'</span>':"");}
   function statusLabel(s){if(s==="sold")return '<span class="tag sold">Sold Out</span>';if(s==="coming")return '<span class="tag coming">Coming Soon</span>';return '<span class="tag available">Available</span>';}
-  function canOrder(p){return p.status!=="sold"&&p.status!=="coming";}
+  function canOrder(p){return p.status!=="sold";}
   function loadCart(){try{return JSON.parse(localStorage.getItem("jk_cart")||"[]");}catch(e){return[];}}
   function saveCart(){localStorage.setItem("jk_cart",JSON.stringify(cart));}
   function cartCount(){return cart.reduce(function(a,i){return a+i.qty;},0);}
@@ -73,8 +73,52 @@
     var box=$("cartItems");if(!cart.length){box.innerHTML='<div style="padding:2rem 1rem;text-align:center;color:var(--muted)">Your cart is empty ✨</div>';}else{box.innerHTML=cart.map(function(i){var p=PRODUCTS.find(function(x){return x.id===i.id;});if(!p)return"";return '<div class="cart-item"><img src="'+esc(p.image)+'" alt=""><div><div class="ci-name">'+esc(p.name)+'</div><div class="ci-price">'+(p.price?fmt(p.price):"Price on DM")+'</div><div class="ci-qty"><button data-q="'+p.id+'" data-d="-1">−</button><span>'+i.qty+'</span><button data-q="'+p.id+'" data-d="1">+</button></div></div><button class="ci-remove" data-rm="'+p.id+'">×</button></div>';}).join("");box.querySelectorAll("[data-q]").forEach(function(b){b.onclick=function(){changeQty(b.dataset.q,Number(b.dataset.d));};});box.querySelectorAll("[data-rm]").forEach(function(b){b.onclick=function(){removeItem(b.dataset.rm);};});}
     $("subtotalAmt").textContent=fmt(cartSubtotal());$("checkoutBtn").disabled=!cart.length;
   }
-  function openCheckout(){if(!cart.length)return;$("checkoutModal").innerHTML='<button class="modal-close" id="ckClose">✕</button><div class="modal-info" style="padding:2rem"><span class="cat">// Checkout</span><h3>Almost <span class="grad-text">There</span> 💜</h3><p class="desc" style="margin-bottom:1.4rem">Tell us where to send your order. We’ll confirm the total and delivery details in Instagram DM.</p><label style="font-size:.78rem;color:var(--muted);letter-spacing:.08em;display:block;margin-bottom:.35rem">YOUR NAME</label><input id="ckName" class="admin-input" style="margin-bottom:1rem" placeholder="e.g. Aisha B."><label style="font-size:.78rem;color:var(--muted);letter-spacing:.08em;display:block;margin-bottom:.35rem">DELIVERY STATE</label><input id="ckState" class="admin-input" placeholder="e.g. Katsina, Kaduna, Lagos…"><div class="modal-actions" style="margin-top:1.4rem"><button class="glow-btn btn-primary" id="ckGo" style="width:100%">📲 CONTINUE TO INSTAGRAM DM</button></div></div>';$('checkoutBackdrop').classList.add('open');$('ckClose').onclick=function(){$('checkoutBackdrop').classList.remove('open');};$('ckGo').onclick=buildOrderMessage;}
-  function buildOrderMessage(){var name=($('ckName').value||"").trim(),state=($('ckState').value||"").trim();var lines=cart.map(function(line){var p=PRODUCTS.find(function(x){return x.id===line.id;});return "• "+line.qty+"x "+p.name+" — "+(p.price?fmt(p.price*line.qty):"price on DM");});var msg="Hi Everything J&K! 🤩 I'd like to place an order:\n\n"+lines.join("\n")+"\n\n💰 Subtotal: "+fmt(cartSubtotal())+(name?"\n👤 Name: "+name:"")+(state?"\n📍 Delivery to: "+state:"")+"\n\nPlease confirm availability & total. Thank you! 💜";copyText(msg);window.open("https://ig.me/m/"+encodeURIComponent(SETTINGS.instagram||"everything_j.k"),"_blank");$('checkoutBackdrop').classList.remove('open');showSummary(msg);}
+  function openCheckout(){
+    if(!cart.length)return;
+    $("checkoutModal").innerHTML='<button class="modal-close" id="ckClose">✕</button><div class="modal-info" style="padding:2rem"><span class="cat">// Checkout</span><h3>Place Your <span class="grad-text">Order</span> 💜</h3><p class="desc" style="margin-bottom:1.4rem">Enter your details below. Your order will be saved securely before WhatsApp opens.</p><label style="font-size:.78rem;color:var(--muted);letter-spacing:.08em;display:block;margin-bottom:.35rem">YOUR NAME</label><input id="ckName" class="admin-input" style="margin-bottom:1rem" placeholder="e.g. Aisha B." autocomplete="name"><label style="font-size:.78rem;color:var(--muted);letter-spacing:.08em;display:block;margin-bottom:.35rem">PHONE NUMBER</label><input id="ckPhone" class="admin-input" style="margin-bottom:1rem" placeholder="e.g. 08012345678" inputmode="tel" autocomplete="tel"><label style="font-size:.78rem;color:var(--muted);letter-spacing:.08em;display:block;margin-bottom:.35rem">DELIVERY ADDRESS</label><textarea id="ckAddress" class="admin-input" style="margin-bottom:1rem;min-height:100px;resize:vertical" placeholder="Enter your full delivery address" autocomplete="street-address"></textarea><div class="modal-actions" style="margin-top:1.4rem"><button class="glow-btn btn-primary" id="ckGo" style="width:100%">🛒 PLACE ORDER</button></div><p id="ckError" style="display:none;color:#ff7b9c;font-size:.82rem;margin-top:.9rem"></p></div>';
+    $("checkoutBackdrop").classList.add("open");
+    $("ckClose").onclick=function(){$("checkoutBackdrop").classList.remove("open");};
+    $("ckGo").onclick=createOrder;
+  }
+  async function createOrder(){
+    var name=($("ckName").value||"").trim();
+    var phone=($("ckPhone").value||"").trim();
+    var address=($("ckAddress").value||"").trim();
+    var errorBox=$("ckError");
+    var button=$("ckGo");
+    function showCheckoutError(message){errorBox.textContent=message;errorBox.style.display="block";button.disabled=false;button.textContent="🛒 PLACE ORDER";}
+    errorBox.style.display="none";
+    if(!name){showCheckoutError("Please enter your name.");return;}
+    if(!phone){showCheckoutError("Please enter your phone number.");return;}
+    if(!address){showCheckoutError("Please enter your delivery address.");return;}
+    if(!cart.length){showCheckoutError("Your cart is empty.");return;}
+    var payload={customer_name:name,customer_phone:phone,delivery_address:address,items:cart.map(function(item){return{product_id:item.id,quantity:item.qty};})};
+    button.disabled=true;
+    button.textContent="⏳ PLACING ORDER...";
+    try{
+      if(!sb)throw new Error("Store connection is unavailable. Please refresh and try again.");
+      var result=await sb.functions.invoke("create-order",{body:payload});
+      if(result.error){
+        var detail=result.error.message||"";
+        throw new Error(detail||"We couldn't create your order. Please try again.");
+      }
+      var data=result.data||{};
+      if(!data.success||!data.order_id||!data.whatsapp_url){throw new Error(data.error||"We couldn't confirm your order. Please try again.");}
+      toast("✅ Order "+data.order_id+" saved successfully!");
+      cart=[];
+      saveCart();
+      renderCart();
+      $("checkoutBackdrop").classList.remove("open");
+      window.location.href=data.whatsapp_url;
+    }catch(error){
+      console.error("Order submission failed:",error);
+      showCheckoutError(error&&error.message?error.message:"We couldn't create your order. Please try again.");
+    }
+  }
+  function buildOrderMessage(){
+    /* Kept as a compatibility shim for any older code that calls this function. */
+    createOrder();
+  }
   function showSummary(msg){$('summaryModal').innerHTML='<button class="modal-close" id="smClose">✕</button><div class="modal-info" style="padding:2rem"><span class="cat">// Order ready</span><h3>Open Instagram & <span class="grad-text">Paste</span> 📋</h3><p class="desc" style="margin-bottom:1rem">We opened Instagram in a new tab and copied your order summary.</p><div style="background:rgba(139,92,246,.08);border:1px solid rgba(139,92,246,.3);border-radius:14px;padding:1rem;font-size:.82rem;white-space:pre-wrap;color:var(--text);margin-bottom:1.2rem;max-height:240px;overflow-y:auto">'+esc(msg)+'</div><div class="modal-actions"><button class="glow-btn btn-ghost" id="smCopy">📋 Copy Again</button><a class="glow-btn btn-primary" href="https://ig.me/m/'+encodeURIComponent(SETTINGS.instagram||"everything_j.k")+'" target="_blank" rel="noopener">📲 Open Instagram DM</a></div></div>';$('summaryBackdrop').classList.add('open');$('smClose').onclick=function(){$('summaryBackdrop').classList.remove('open');};$('smCopy').onclick=function(){copyText(msg);toast("✅ Order summary copied again!");};cart=[];saveCart();renderCart();}
   function copyText(txt){function legacy(){var ta=document.createElement("textarea");ta.value=txt;ta.style.position="fixed";ta.style.opacity="0";document.body.appendChild(ta);ta.select();try{document.execCommand("copy");}catch(e){}ta.remove();}if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(txt).catch(legacy);else legacy();}
   function renderSettings(){var ig=SETTINGS.instagram||"everything_j.k",tk=SETTINGS.tiktok||"",em=SETTINGS.email||"",ws=SETTINGS.whatsapp||"";$('announceBar').innerHTML='<i>✨</i> '+esc(SETTINGS.announcement||"");$('navShopName').textContent=(SETTINGS.shopName||"Everything J&K").replace(/^Everything\s*/i,"");$('heroShopName').textContent=SETTINGS.shopName||"J&K";$('heroTagline').textContent=SETTINGS.tagline||"";$('heroLocation').textContent=SETTINGS.location||"";var wrap=$('heroLogoWrap'),title=$('heroTitle'),logo=$('heroLogo');if(wrap&&title&&logo){if(SETTINGS.heroLogo){logo.src=SETTINGS.heroLogo;wrap.className="hero-logo-wrap logo-anim-"+(SETTINGS.heroLogoAnimation||"fade");title.classList.add("has-custom-logo");}else{wrap.className="hero-logo-wrap hidden";title.classList.remove("has-custom-logo");}}$('heroIgLink').href="https://ig.me/m/"+encodeURIComponent(ig);$('contactIg').href="https://ig.me/m/"+encodeURIComponent(ig);$('contactIg').innerHTML="📲 DM @"+esc(ig);$('contactTikTok').href=tk?"https://www.tiktok.com/@"+encodeURIComponent(tk):"#";$('contactTikTok').style.display=tk?"":"none";$('deliveryNote').textContent=SETTINGS.deliveryNote||"";var links='<a href="mailto:'+esc(em)+'">✉️ '+esc(em)+"</a>";links+='<a href="https://www.instagram.com/'+encodeURIComponent(ig)+'" target="_blank" rel="noopener">📸 instagram.com/'+esc(ig)+"</a>";if(tk)links+='<a href="https://www.tiktok.com/@'+encodeURIComponent(tk)+'" target="_blank" rel="noopener">🎵 tiktok.com/@'+esc(tk)+"</a>";$('contactLinks').innerHTML=links;var soc='<a href="https://www.instagram.com/'+encodeURIComponent(ig)+'" target="_blank" rel="noopener">📸</a>';if(tk)soc+='<a href="https://www.tiktok.com/@'+encodeURIComponent(tk)+'" target="_blank" rel="noopener">🎵</a>';soc+='<a href="mailto:'+esc(em)+'">✉️</a>';if(ws)soc+='<a href="https://wa.me/'+encodeURIComponent(ws.replace(/\D/g,""))+'" target="_blank" rel="noopener">💬</a>';$('socialLinks').innerHTML=soc;$('footerShopName').textContent=SETTINGS.shopName||"Everything J&K";$('footerLocation').textContent=SETTINGS.location||"";$('footerIg').href="https://www.instagram.com/"+encodeURIComponent(ig);$('footerIg').textContent="@"+ig;}
