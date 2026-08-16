@@ -23,6 +23,7 @@
     <div class="lock">🔐</div>
     <h1>EVERYTHING <span class="grad-text">J&K</span></h1>
     <p class="sub">Admin Control Panel — sign in to manage your store</p>
+    <input type="email" id="loginEmail" class="admin-input" placeholder="Admin email" autocomplete="username">
     <input type="password" id="loginPass" class="admin-input" placeholder="Enter admin password" autocomplete="current-password">
     <div class="login-err" id="loginErr"></div>
     <button class="glow-btn btn-primary" id="loginBtn" style="width:100%;margin-top:.6rem">UNLOCK PANEL</button>
@@ -132,14 +133,12 @@
   <div class="tab-pane" id="tab-security">
     <div class="panel" style="max-width:520px">
       <h2>CHANGE PASSWORD</h2>
-      <label class="flabel">Current password</label>
-      <input type="password" class="admin-input" id="curPass">
       <label class="flabel">New password (min 6 characters)</label>
       <input type="password" class="admin-input" id="newPass">
       <label class="flabel">Confirm new password</label>
       <input type="password" class="admin-input" id="newPass2">
       <button class="glow-btn btn-primary" id="changePassBtn" style="margin-top:1.4rem">🔑 Update Password</button>
-      <p style="color:var(--muted);font-size:.78rem;margin-top:1rem">Default password: <code style="color:var(--cyan)">jk2026</code> — change it once you're in!</p>
+      <p style="color:var(--muted);font-size:.78rem;margin-top:1rem">Your admin account is secured by Supabase Auth.</p>
     </div>
   </div>
 
@@ -151,7 +150,7 @@
         <b style="color:#fff">1. Add / edit products</b> — fill the form, click <b style="color:var(--green)">Save Product</b>.<br>
         <b style="color:#fff">2. Pictures</b> — click the dashed box to upload; images are auto-compressed. You can also paste any image URL into the <i>name</i> field's place — no wait, use the upload box.<br>
         <b style="color:#fff">3. Price 0</b> — shows "Price on DM 💬" on the store. Perfect for preorders.<br>
-        <b style="color:#fff">4. Publish your changes</b> — after editing, click <b style="color:var(--green)">⬇ Export data.js</b> and replace the <code style="color:var(--cyan)">data.js</code> file in this folder (or re-upload it where your site is hosted). Your own browser previews changes instantly; the exported file is what visitors see.<br>
+        <b style="color:#fff">4. Publish your changes</b> — click <b style="color:var(--green)">Save Product</b> or <b style="color:var(--green)">Save Settings</b>. Changes are saved to the online database and appear for all visitors.<br>
         <b style="color:#fff">5. Checkout</b> — customers' carts redirect to your Instagram DM with the order summary copied. 💌
       </p>
     </div>
@@ -161,6 +160,8 @@
 <div class="toast" id="toast"></div>
 
 <script src="data.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-client.js"></script>
 <script src="admin.js"></script>
 </body>
 </html>

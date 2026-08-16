@@ -50,21 +50,47 @@
     toastTimer = setTimeout(function () { t.className = "toast"; }, 2600);
   }
 
-  /* ---------- Auth ---------- */
-  async function tryLogin(pass) {
-    var hash = getStoredHash();
-    var ok;
-    if (hash) ok = (await sha256(pass)) === hash;
-    else ok = pass === DEFAULT_PASS;
-    if (ok) {
-      sessionStorage.setItem("jk_admin_ok", "1");
-      showDash();
-      toast("🔓 Welcome back, boss!");
-    } else {
-      $("loginErr").textContent = "❌ Wrong password. Try again.";
+  /* ---------- Supabase data + Auth ---------- */
+  async function loadRemoteData() {
+    if (!window.jkSupabase) return;
+    var pr = await window.jkSupabase.from("products").select("*").order("updated_at", { ascending: false });
+    if (pr.error) throw pr.error;
+    STORE.products = (pr.data || []).map(function (p) {
+      return { id:p.id, name:p.name, category:p.category, price:Number(p.price)||0, oldPrice:p.old_price == null ? null : Number(p.old_price), status:p.status, image:p.image, desc:p.description || "" };
+    });
+    var sr = await window.jkSupabase.from("shop_settings").select("*").eq("id",1).maybeSingle();
+    if (sr.error) throw sr.error;
+    if (sr.data) {
+      STORE.settings = {
+        shopName:sr.data.shop_name, tagline:sr.data.tagline, announcement:sr.data.announcement,
+        location:sr.data.location, deliveryNote:sr.data.delivery_note, instagram:sr.data.instagram,
+        tiktok:sr.data.tiktok, email:sr.data.email, whatsapp:sr.data.whatsapp
+      };
     }
   }
-  function logout() {
+
+  async function tryLogin(email, pass) {
+    if (window.jkSupabase) {
+      var result = await window.jkSupabase.auth.signInWithPassword({ email: email, password: pass });
+      if (result.error) {
+        $("loginErr").textContent = "❌ " + result.error.message;
+        return;
+      }
+      sessionStorage.setItem("jk_admin_ok", "1");
+      try { await loadRemoteData(); } catch (e) { toast("Could not load the online store data.", true); }
+      showDash();
+      toast("🔓 Welcome back, boss!");
+      return;
+    }
+    /* Local fallback for offline development only. */
+    var hash = getStoredHash();
+    var ok = hash ? (await sha256(pass)) === hash : pass === DEFAULT_PASS;
+    if (ok) { sessionStorage.setItem("jk_admin_ok", "1"); showDash(); }
+    else $("loginErr").textContent = "❌ Wrong password. Try again.";
+  }
+
+  async function logout() {
+    if (window.jkSupabase) await window.jkSupabase.auth.signOut();
     sessionStorage.removeItem("jk_admin_ok");
     showLogin();
   }
@@ -72,18 +98,24 @@
     $("loginView").classList.remove("hidden");
     $("dashView").classList.add("hidden");
   }
-  function showDash() {
+  async function showDash() {
     $("loginView").classList.add("hidden");
     $("dashView").classList.remove("hidden");
+    try { await loadRemoteData(); } catch (e) { console.warn(e); }
     renderList();
     fillSettings();
   }
 
   /* ---------- Product CRUD ---------- */
-  function persistProducts() {
-    localStorage.setItem("jk_products", JSON.stringify(STORE.products));
+  async function persistProducts() {
+    if (!window.jkSupabase) { localStorage.setItem("jk_products", JSON.stringify(STORE.products)); return; }
+    var rows = STORE.products.map(function (p) {
+      return { id:p.id, name:p.name, category:p.category || "General", price:Number(p.price)||0, old_price:p.oldPrice == null ? null : Number(p.oldPrice), status:p.status || "available", image:p.image || "", description:p.desc || "", updated_at:new Date().toISOString() };
+    });
+    var result = await window.jkSupabase.from("products").upsert(rows, { onConflict:"id" });
+    if (result.error) throw result.error;
   }
-  function saveProduct(e) {
+  async function saveProduct(e) {
     e.preventDefault();
     var name = $("fName").value.trim();
     if (!name) { toast("Please enter a product name.", true); return; }
@@ -105,7 +137,7 @@
     } else {
       STORE.products.push(obj);
     }
-    persistProducts();
+    try { await persistProducts(); } catch (err) { toast("❌ Could not save to the online database: " + err.message, true); return; }
     editingId = null;
     resetForm();
     renderList();
@@ -125,13 +157,20 @@
     setImage(p.image);
     $("tab-products").scrollIntoView({ behavior: "smooth", block: "start" });
   }
-  function deleteProduct(id) {
+  async function deleteProduct(id) {
     if (!confirm("Delete this product permanently?")) return;
     STORE.products = STORE.products.filter(function (x) { return x.id !== id; });
     if (editingId === id) resetForm();
-    persistProducts();
-    renderList();
-    toast("🗑 Product deleted.");
+    try {
+      if (window.jkSupabase) {
+        var result = await window.jkSupabase.from("products").delete().eq("id", id);
+        if (result.error) throw result.error;
+      } else {
+        await persistProducts();
+      }
+      renderList();
+      toast("🗑 Product deleted.");
+    } catch (err) { toast("❌ Could not delete online: " + err.message, true); }
   }
   function resetForm() {
     editingId = null;
@@ -225,7 +264,7 @@
     $("sEmail").value = s.email || "";
     $("sWhatsapp").value = s.whatsapp || "";
   }
-  function saveSettings() {
+  async function saveSettings() {
     STORE.settings = {
       shopName: $("sShopName").value.trim(),
       tagline: $("sTagline").value.trim(),
@@ -237,20 +276,33 @@
       email: $("sEmail").value.trim(),
       whatsapp: $("sWhatsapp").value.trim()
     };
-    localStorage.setItem("jk_settings", JSON.stringify(STORE.settings));
-    toast("✅ Settings saved!");
+    try {
+      if (window.jkSupabase) {
+        var result = await window.jkSupabase.from("shop_settings").upsert({
+          id:1, shop_name:STORE.settings.shopName, tagline:STORE.settings.tagline, announcement:STORE.settings.announcement,
+          location:STORE.settings.location, delivery_note:STORE.settings.deliveryNote, instagram:STORE.settings.instagram,
+          tiktok:STORE.settings.tiktok, email:STORE.settings.email, whatsapp:STORE.settings.whatsapp, updated_at:new Date().toISOString()
+        }, { onConflict:"id" });
+        if (result.error) throw result.error;
+      } else {
+        localStorage.setItem("jk_settings", JSON.stringify(STORE.settings));
+      }
+      toast("✅ Settings saved online!");
+    } catch (err) { toast("❌ Could not save settings online: " + err.message, true); }
   }
 
   /* ---------- Password ---------- */
   async function changePass() {
-    var cur = $("curPass").value, nw = $("newPass").value, nw2 = $("newPass2").value;
-    var hash = getStoredHash();
-    var curOk = hash ? (await sha256(cur)) === hash : cur === DEFAULT_PASS;
-    if (!curOk) { toast("Current password is wrong.", true); return; }
+    var nw = $("newPass").value, nw2 = $("newPass2").value;
     if (nw.length < 6) { toast("New password must be at least 6 characters.", true); return; }
     if (nw !== nw2) { toast("Passwords don't match.", true); return; }
-    localStorage.setItem("jk_admin_hash", await sha256(nw));
-    $("curPass").value = $("newPass").value = $("newPass2").value = "";
+    if (window.jkSupabase) {
+      var result = await window.jkSupabase.auth.updateUser({ password: nw });
+      if (result.error) { toast("Could not update password: " + result.error.message, true); return; }
+    } else {
+      localStorage.setItem("jk_admin_hash", await sha256(nw));
+    }
+    $("newPass").value = $("newPass2").value = "";
     toast("🔑 Password updated!");
   }
 
@@ -286,11 +338,13 @@
   }
 
   /* ---------- Init ---------- */
-  function init() {
-    if (sessionStorage.getItem("jk_admin_ok")) showDash(); else showLogin();
+  async function init() {
+    var session = window.jkSupabase ? (await window.jkSupabase.auth.getSession()).data.session : null;
+    if (session) { sessionStorage.setItem("jk_admin_ok", "1"); await showDash(); }
+    else showLogin();
     initTabs();
-    $("loginBtn").addEventListener("click", function () { tryLogin($("loginPass").value); });
-    $("loginPass").addEventListener("keydown", function (e) { if (e.key === "Enter") tryLogin($("loginPass").value); });
+    $("loginBtn").addEventListener("click", function () { tryLogin($("loginEmail").value.trim(), $("loginPass").value); });
+    $("loginPass").addEventListener("keydown", function (e) { if (e.key === "Enter") tryLogin($("loginEmail").value.trim(), $("loginPass").value); });
     $("logoutBtn").addEventListener("click", logout);
     $("saveBtn").addEventListener("click", saveProduct);
     $("resetFormBtn").addEventListener("click", resetForm);
