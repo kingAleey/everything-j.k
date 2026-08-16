@@ -11,6 +11,8 @@
   var editingId = null;
   var currentImage = "";
   var currentLogo = "";
+  var pendingCropData = "";
+  var pendingCropBlob = null;
   var cropState = { img:null, zoom:1, x:0, y:0, startX:0, startY:0, dragging:false };
   var toastTimer = null;
 
@@ -61,16 +63,30 @@
 
   async function uploadAsset(dataUrl, folder, extension){
     var blob = await (await fetch(dataUrl)).blob();
+    return uploadAssetBlob(blob, folder, extension);
+  }
+  async function uploadAssetBlob(blob, folder, extension){
     var path = folder + "/" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2) + "." + extension;
-    var r=await sb.storage.from("jk-assets").upload(path,blob,{contentType:blob.type||("image/"+extension),upsert:false});
+    var r=await sb.storage.from("jk-assets").upload(path,blob,{contentType:blob.type||("image/"+extension),upsert:false,cacheControl:"31536000"});
     if(r.error) throw r.error;
     return sb.storage.from("jk-assets").getPublicUrl(path).data.publicUrl;
   }
 
-  function setImage(src){ currentImage=src||""; if(currentImage){$("fImgPreview").src=currentImage;$("fImgPreview").classList.remove("hidden");$("imgPh").classList.add("hidden");}else{$("fImgPreview").classList.add("hidden");$("imgPh").classList.remove("hidden");} }
+  function setImage(src){ currentImage=src||""; pendingCropData=""; pendingCropBlob=null; if(currentImage){$("fImgPreview").src=currentImage;$("fImgPreview").classList.remove("hidden");$("imgPh").classList.add("hidden");}else{$("fImgPreview").classList.add("hidden");$("imgPh").classList.remove("hidden");} }
   function openCropper(file){
     if(!file || !file.type.match(/^image\//)){toast("Please choose an image file.",true);return;}
-    var reader=new FileReader(); reader.onload=function(ev){var img=new Image(); img.onload=function(){cropState.img=img;cropState.zoom=1;cropState.x=0;cropState.y=0;$("cropZoom").value="1";$("cropBackdrop").classList.remove("hidden");drawCrop();};img.src=ev.target.result;};reader.readAsDataURL(file);
+    if(file.size > 12 * 1024 * 1024){toast("Please choose an image smaller than 12MB.",true);return;}
+    var url=URL.createObjectURL(file);
+    var img=new Image();
+    img.onload=function(){
+      URL.revokeObjectURL(url);
+      cropState.img=img;cropState.zoom=1;cropState.x=0;cropState.y=0;
+      $("cropZoom").value="1";
+      $("cropBackdrop").classList.remove("hidden");
+      drawCrop();
+    };
+    img.onerror=function(){URL.revokeObjectURL(url);toast("Could not open that picture. Please try another image.",true);};
+    img.src=url;
   }
   function drawCrop(){
     var c=$("cropCanvas"),ctx=c.getContext("2d"),img=cropState.img;if(!img)return;
@@ -80,19 +96,48 @@
   }
   function resetCrop(){cropState.zoom=1;cropState.x=0;cropState.y=0;$("cropZoom").value="1";drawCrop();}
   async function applyCrop(){
-    var c=$("cropCanvas");var data=c.toDataURL("image/jpeg",.88);if(data.length>2400000){toast("Crop is too large. Zoom out or use a smaller original image.",true);return;} 
-    try{toast("Uploading cropped image…");var url=await uploadAsset(data,"products","jpg");setImage(url);$("cropBackdrop").classList.add("hidden");toast("✂️ Crop saved.");}catch(e){toast("Image upload failed: "+e.message,true);}
+    var c=$("cropCanvas");
+    if(!cropState.img){toast("Please choose a picture first.",true);return;}
+    try{
+      var blob=await new Promise(function(resolve,reject){
+        c.toBlob(function(b){if(b)resolve(b);else reject(new Error("Could not prepare the cropped picture."));},"image/jpeg",.82);
+      });
+      if(blob.size>1400000){toast("Picture is still too large. Zoom out slightly and try again.",true);return;}
+      pendingCropBlob=blob;
+      pendingCropData=URL.createObjectURL(blob);
+      currentImage=pendingCropData;
+      $("fImgPreview").src=pendingCropData;
+      $("fImgPreview").classList.remove("hidden");
+      $("imgPh").classList.add("hidden");
+      $("cropBackdrop").classList.add("hidden");
+      toast("📤 Picture ready. Now press Save Product.");
+    }catch(err){
+      console.error("Crop export failed",err);
+      toast("Could not prepare the cropped picture. Please try again.",true);
+    }
   }
   function handleCropPointerDown(e){if(!cropState.img)return;cropState.dragging=true;cropState.startX=e.clientX-cropState.x;cropState.startY=e.clientY-cropState.y;$("cropCanvas").setPointerCapture(e.pointerId);$("cropCanvas").classList.add("dragging");}
   function handleCropPointerMove(e){if(!cropState.dragging)return;cropState.x=e.clientX-cropState.startX;cropState.y=e.clientY-cropState.startY;drawCrop();}
   function handleCropPointerUp(){cropState.dragging=false;$("cropCanvas").classList.remove("dragging");}
 
   function editProduct(id){var p=STORE.products.find(function(x){return x.id===id;});if(!p)return;editingId=id;$("fId").value=id;$("fName").value=p.name;$("fCategory").value=p.category||"";$("fPrice").value=p.price||"";$("fOldPrice").value=p.oldPrice||"";$("fStatus").value=p.status||"available";$("fDesc").value=p.desc||"";setImage(p.image);$("tab-products").scrollIntoView({behavior:"smooth",block:"start"});}
-  function resetForm(){editingId=null;$("fId").value="";$("fName").value="";$("fCategory").value="";$("fPrice").value="";$("fOldPrice").value="";$("fStatus").value="available";$("fDesc").value="";setImage("");}
+  function resetForm(){
+    if(pendingCropData && pendingCropData.indexOf("blob:")===0){try{URL.revokeObjectURL(pendingCropData);}catch(e){}}
+    editingId=null;pendingCropData="";pendingCropBlob=null;$("fId").value="";$("fName").value="";$("fCategory").value="";$("fPrice").value="";$("fOldPrice").value="";$("fStatus").value="available";$("fDesc").value="";setImage("");}
 
   async function saveProduct(e){
     e.preventDefault();var name=$("fName").value.trim();if(!name){toast("Please enter a product name.",true);return;}
-    var obj={id:editingId||"p"+Date.now().toString(36),name:name,category:$("fCategory").value.trim()||"General",price:Math.max(0,parseInt($("fPrice").value,10)||0),oldPrice:$("fOldPrice").value?parseInt($("fOldPrice").value,10)||null:null,status:$("fStatus").value,image:currentImage||"assets/hero.jpg",desc:$("fDesc").value.trim()};
+    var imageUrl=currentImage||"assets/hero.jpg";
+    if(pendingCropBlob || pendingCropData){
+      try{
+        toast("Uploading picture…");
+        imageUrl=pendingCropBlob ? await uploadAssetBlob(pendingCropBlob,"products","jpg") : await uploadAsset(pendingCropData,"products","jpg");
+      }catch(e){
+        toast("Picture upload failed: "+(e.message||"Please try again."),true);
+        return;
+      }
+    }
+    var obj={id:editingId||"p"+Date.now().toString(36),name:name,category:$("fCategory").value.trim()||"General",price:Math.max(0,parseInt($("fPrice").value,10)||0),oldPrice:$("fOldPrice").value?parseInt($("fOldPrice").value,10)||null:null,status:$("fStatus").value,image:imageUrl,desc:$("fDesc").value.trim()};
     var payload={id:obj.id,name:obj.name,category:obj.category,price:obj.price,old_price:obj.oldPrice,status:obj.status,image:obj.image,description:obj.desc};
     var r=editingId?await sb.from("products").update(payload).eq("id",editingId):await sb.from("products").insert(payload);
     if(r.error){toast("Could not save product: "+r.error.message,true);return;}
@@ -122,6 +167,7 @@
     $("loginPass").addEventListener("keydown",function(e){if(e.key==="Enter")tryLogin($("loginEmail").value,$("loginPass").value);});
     $("logoutBtn").addEventListener("click",logout);$("saveBtn").addEventListener("click",saveProduct);$("resetFormBtn").addEventListener("click",resetForm);$("saveSettingsBtn").addEventListener("click",saveSettings);$("changePassBtn").addEventListener("click",changePass);$("exportBtn").addEventListener("click",exportData);
     $("imgDrop").addEventListener("click",function(){$("fImgFile").click();});$("fImgFile").addEventListener("change",function(e){if(e.target.files[0])openCropper(e.target.files[0]);e.target.value="";});
+    $("cropApply").textContent="📤 Upload Picture";
     $("cropCancel").addEventListener("click",function(){$("cropBackdrop").classList.add("hidden");});$("cropApply").addEventListener("click",applyCrop);$("cropReset").addEventListener("click",resetCrop);$("cropZoom").addEventListener("input",function(){cropState.zoom=Number(this.value);drawCrop();});$("cropCanvas").addEventListener("pointerdown",handleCropPointerDown);$("cropCanvas").addEventListener("pointermove",handleCropPointerMove);$("cropCanvas").addEventListener("pointerup",handleCropPointerUp);$("cropCanvas").addEventListener("pointercancel",handleCropPointerUp);
     $("logoDrop").addEventListener("click",function(){$("sLogoFile").click();});$("sLogoFile").addEventListener("change",function(e){if(e.target.files[0])handleLogoFile(e.target.files[0]);e.target.value="";});
     var sr=await sb.auth.getSession();if(sr.data&&sr.data.session){try{await loadData();showDash();}catch(e){showLogin();$("loginErr").textContent="❌ Admin account is authenticated but not authorized yet. Set app_metadata role to admin in Supabase.";}}else showLogin();
