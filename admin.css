@@ -145,11 +145,3 @@ label.flabel{display:block;font-size:.74rem;color:var(--muted);letter-spacing:.1
   .crop-controls #cropApply{grid-column:1/-1;width:100%;justify-content:center}
 }
 
-/* Hide the bottom-center toast container from the admin dashboard as well. */
-.toast,
-.toast.show,
-.toast.error{
-  display:none !important;
-  visibility:hidden !important;
-  pointer-events:none !important;
-}
