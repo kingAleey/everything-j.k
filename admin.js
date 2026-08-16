@@ -99,18 +99,26 @@
     var c=$("cropCanvas");
     if(!cropState.img){toast("Please choose a picture first.",true);return;}
     try{
+      /* Keep the cropped product image inside the existing database flow.
+         No Storage upload is required, so this does not depend on Storage RLS. */
       var blob=await new Promise(function(resolve,reject){
-        c.toBlob(function(b){if(b)resolve(b);else reject(new Error("Could not prepare the cropped picture."));},"image/jpeg",.82);
+        c.toBlob(function(b){if(b)resolve(b);else reject(new Error("Could not prepare the cropped picture."));},"image/jpeg",.76);
       });
-      if(blob.size>1400000){toast("Picture is still too large. Zoom out slightly and try again.",true);return;}
+      if(!blob || blob.size>900000){toast("Picture is too large after cropping. Please zoom/crop a little more and try again.",true);return;}
+      var dataUrl=await new Promise(function(resolve,reject){
+        var reader=new FileReader();
+        reader.onload=function(){resolve(reader.result);};
+        reader.onerror=function(){reject(new Error("Could not prepare the picture for saving."));};
+        reader.readAsDataURL(blob);
+      });
       pendingCropBlob=blob;
-      pendingCropData=URL.createObjectURL(blob);
-      currentImage=pendingCropData;
-      $("fImgPreview").src=pendingCropData;
+      pendingCropData=dataUrl;
+      currentImage=dataUrl;
+      $("fImgPreview").src=dataUrl;
       $("fImgPreview").classList.remove("hidden");
       $("imgPh").classList.add("hidden");
       $("cropBackdrop").classList.add("hidden");
-      toast("📤 Picture ready. Now press Save Product.");
+      toast("📤 Picture uploaded. Now press Save Product.");
     }catch(err){
       console.error("Crop export failed",err);
       toast("Could not prepare the cropped picture. Please try again.",true);
@@ -128,14 +136,11 @@
   async function saveProduct(e){
     e.preventDefault();var name=$("fName").value.trim();if(!name){toast("Please enter a product name.",true);return;}
     var imageUrl=currentImage||"assets/hero.jpg";
-    if(pendingCropBlob || pendingCropData){
-      try{
-        toast("Uploading picture…");
-        imageUrl=pendingCropBlob ? await uploadAssetBlob(pendingCropBlob,"products","jpg") : await uploadAsset(pendingCropData,"products","jpg");
-      }catch(e){
-        toast("Picture upload failed: "+(e.message||"Please try again."),true);
-        return;
-      }
+    if(pendingCropData){
+      /* The crop is already prepared as a compact JPEG data URL.
+         Save that exact crop with the product; do not change Auth, schema,
+         or Storage configuration. */
+      imageUrl=pendingCropData;
     }
     var obj={id:editingId||"p"+Date.now().toString(36),name:name,category:$("fCategory").value.trim()||"General",price:Math.max(0,parseInt($("fPrice").value,10)||0),oldPrice:$("fOldPrice").value?parseInt($("fOldPrice").value,10)||null:null,status:$("fStatus").value,image:imageUrl,desc:$("fDesc").value.trim()};
     var payload={id:obj.id,name:obj.name,category:obj.category,price:obj.price,old_price:obj.oldPrice,status:obj.status,image:obj.image,description:obj.desc};
