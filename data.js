@@ -72,7 +72,7 @@ window.JK_SETTINGS = {
   announcement: "Prices changing soon! Secure your favourites at current prices ✨",
   instagram: "everything_j.k",
   tiktok: "everything_j.k",
-  email: "Umarfaruklawal@gmail.com",
+  email: "kingkadooh@gmail.com",
   whatsapp: "",
   location: "Katsina, Nigeria",
   deliveryNote: "Nationwide delivery across Nigeria 🇳🇬 — shipping is quoted after your DM."
