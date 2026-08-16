@@ -1,60 +1,41 @@
-EVERYTHING J&K — FINAL DEPLOYMENT
+EVERYTHING J&K — FINAL RECOVERED + SUPABASE SETUP
 
-FILES TO UPLOAD
-- index.html
-- jk-control-panel.html
-- store.js
-- admin.js
-- data.js
-- style.css
-- mobile-fix.css
-- admin.css
-- supabase.sql
-- assets/ (folder)
+IMPORTANT
+This package was rebuilt from the original working project and then the requested UI changes were added.
+It does not include the old screenshots, backup HTML, old admin.html, or intermediate ZIPs.
 
 1) SUPABASE DATABASE
-Open Supabase > SQL Editor > New query.
-Paste ALL of supabase.sql and Run.
+Open Supabase > SQL Editor and run ALL of supabase.sql.
+This migration is safe for an existing database: it adds missing columns (including sort_order) instead of recreating the tables, and it does not overwrite existing products/settings.
+At the end it returns product/settings verification rows.
 
-2) ADMIN AUTHORIZATION
-You already created the admin user in Supabase Authentication > Users.
-For that user, open its details and set Raw App Metadata to:
-{"role":"admin"}
+2) ADMIN USER
+Create your admin account in Supabase > Authentication > Users.
+Then run this with your exact admin email:
 
-Do NOT put this in User Metadata. It must be App Metadata.
+UPDATE auth.users
+SET raw_app_meta_data =
+  coalesce(raw_app_meta_data, '{}'::jsonb) || '{"role":"admin"}'::jsonb
+WHERE email = 'YOUR-ADMIN-EMAIL';
 
-3) ADMIN LOGIN
-Open:
-https://YOUR-DOMAIN/jk-control-panel.html
+Log out and sign in again after changing the role.
 
-Use the SAME email/password you created in Supabase Authentication.
-The old local password (jk2026) is no longer used.
+3) ADMIN URL
+The admin page is now:
+/jk-control-panel.html
 
-4) GLOBAL PRODUCT UPDATES
-Admin product edits, additions and deletions now save to Supabase.
-The public site reads Supabase, so visitors see the same products.
+4) NETLIFY
+Upload the contents of this folder to GitHub and let Netlify deploy from that repository.
+Do not upload any secret/service-role Supabase key. The browser uses only the publishable key.
 
-5) GLOBAL SHOP SETTINGS
-Contact details, announcement, delivery note, logo and logo animation save to Supabase.
+5) GLOBAL UPDATES
+Products and store settings are saved to Supabase, not localStorage. Product images/logo uploads use the jk-assets storage bucket.
 
-6) PRODUCT IMAGE CROP
-Upload a product image in the admin panel.
-The crop editor uses the homepage product-card ratio (10:11).
-Drag the image, zoom, then choose “Use this crop”.
-The cropped image is uploaded to Supabase Storage.
+6) PRODUCT CROP
+The admin image upload opens a 10:11 crop editor matching the homepage product card ratio. Drag/zoom, then choose the crop.
 
-7) HOMEPAGE LOGO
-Upload a logo in Store Settings, choose an animation, then Save Settings.
-The live homepage loads it from Supabase Storage.
+7) LOGO
+Store Settings includes homepage logo upload and animation choices: fade, glow, float, slide.
 
-8) SECURITY
-The frontend uses the Supabase publishable key only.
-Never add a Supabase secret/service-role key to these files.
-Database writes and storage uploads are restricted by Row Level Security to users whose Auth App Metadata role is admin.
-
-9) NETLIFY
-Push the final files/folder to GitHub and let Netlify redeploy.
-No Netlify environment variable is required for this version because the public Supabase URL and publishable key are safe client configuration when RLS is correctly enabled.
-
-10) DOMAIN / TRUEHOST LATER
-Keep the site hosted on Netlify if you want. Buy the domain from Truehost and point its DNS to Netlify. The Supabase database does not need to move.
+8) SAFETY
+Do not delete your existing Supabase tables or users. If you already ran an older SQL version, run this safe migration instead.

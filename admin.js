@@ -47,7 +47,7 @@
     var r=await sb.auth.signInWithPassword({email:email,password:pass});
     if(r.error){$("loginErr").textContent="❌ "+r.error.message;return;}
     try { await loadData(); showDash(); toast("🔓 Welcome back!"); }
-    catch(e){ await sb.auth.signOut(); $("loginErr").textContent="❌ Database access is not configured for this admin yet."; }
+    catch(e){ await sb.auth.signOut(); var msg=(e && (e.message || e.details || e.hint)) ? (e.message || e.details || e.hint) : "Unknown database error"; $("loginErr").textContent="❌ Database error: "+msg; console.error("J&K admin database error", e); }
   }
   async function logout(){ if(sb) await sb.auth.signOut(); showLogin(); }
 

@@ -1,8 +1,7 @@
--- EVERYTHING J&K — Supabase production setup
--- Run once in Supabase SQL Editor.
--- After creating your admin Auth user, set its app_metadata to:
--- { "role": "admin" }
--- Then the dashboard can write to products/settings and storage.
+-- EVERYTHING J&K — SAFE SUPABASE SETUP / MIGRATION
+-- Run this entire file in Supabase SQL Editor.
+-- It is designed to preserve existing data and add only missing columns.
+-- NEVER put a Supabase secret/service-role key in the website.
 
 create table if not exists public.products (
   id text primary key,
@@ -17,6 +16,18 @@ create table if not exists public.products (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+-- IMPORTANT: add missing columns to an already-created table instead of recreating it.
+alter table public.products add column if not exists name text;
+alter table public.products add column if not exists category text default 'General';
+alter table public.products add column if not exists price integer default 0;
+alter table public.products add column if not exists old_price integer;
+alter table public.products add column if not exists status text default 'available';
+alter table public.products add column if not exists image text default 'assets/hero.jpg';
+alter table public.products add column if not exists description text default '';
+alter table public.products add column if not exists sort_order integer default 0;
+alter table public.products add column if not exists created_at timestamptz default now();
+alter table public.products add column if not exists updated_at timestamptz default now();
 
 create table if not exists public.shop_settings (
   id integer primary key default 1 check (id = 1),
@@ -34,11 +45,51 @@ create table if not exists public.shop_settings (
   updated_at timestamptz not null default now()
 );
 
+alter table public.shop_settings add column if not exists shop_name text default 'Everything J&K';
+alter table public.shop_settings add column if not exists tagline text default '';
+alter table public.shop_settings add column if not exists announcement text default '';
+alter table public.shop_settings add column if not exists instagram text default 'everything_j.k';
+alter table public.shop_settings add column if not exists tiktok text default 'everything_j.k';
+alter table public.shop_settings add column if not exists email text default '';
+alter table public.shop_settings add column if not exists whatsapp text default '';
+alter table public.shop_settings add column if not exists location text default 'Katsina, Nigeria';
+alter table public.shop_settings add column if not exists delivery_note text default '';
+alter table public.shop_settings add column if not exists hero_logo text default '';
+alter table public.shop_settings add column if not exists hero_logo_animation text default 'fade';
+alter table public.shop_settings add column if not exists updated_at timestamptz default now();
+
+-- Fill nulls introduced by adding columns to an older table.
+update public.products set
+  name = coalesce(name,'Unnamed product'),
+  category = coalesce(category,'General'),
+  price = coalesce(price,0),
+  status = coalesce(status,'available'),
+  image = coalesce(image,'assets/hero.jpg'),
+  description = coalesce(description,''),
+  sort_order = coalesce(sort_order,0),
+  created_at = coalesce(created_at,now()),
+  updated_at = coalesce(updated_at,now())
+where name is null or category is null or price is null or status is null or image is null or description is null or sort_order is null or created_at is null or updated_at is null;
+
+update public.shop_settings set
+  shop_name = coalesce(shop_name,'Everything J&K'),
+  tagline = coalesce(tagline,''),
+  announcement = coalesce(announcement,''),
+  instagram = coalesce(instagram,'everything_j.k'),
+  tiktok = coalesce(tiktok,'everything_j.k'),
+  email = coalesce(email,''),
+  whatsapp = coalesce(whatsapp,''),
+  location = coalesce(location,'Katsina, Nigeria'),
+  delivery_note = coalesce(delivery_note,''),
+  hero_logo = coalesce(hero_logo,''),
+  hero_logo_animation = coalesce(hero_logo_animation,'fade'),
+  updated_at = coalesce(updated_at,now());
+
 insert into public.shop_settings (id)
 values (1)
 on conflict (id) do nothing;
 
--- Timestamp helpers.
+-- Keep timestamps current.
 create or replace function public.touch_updated_at()
 returns trigger
 language plpgsql
@@ -59,8 +110,7 @@ create trigger settings_touch_updated_at
 before update on public.shop_settings
 for each row execute function public.touch_updated_at();
 
--- Admin role helper. Role is stored in Supabase Auth app_metadata,
--- which normal users cannot edit from the browser.
+-- Admin authorization comes from Auth app_metadata, not user-editable metadata.
 create or replace function public.is_admin()
 returns boolean
 language sql
@@ -77,12 +127,10 @@ grant execute on function public.is_admin() to authenticated;
 alter table public.products enable row level security;
 alter table public.shop_settings enable row level security;
 
--- Least-privilege Data API grants. RLS remains the final authorization layer.
 grant select on public.products, public.shop_settings to anon, authenticated;
 grant insert, update, delete on public.products to authenticated;
 grant update on public.shop_settings to authenticated;
 
--- Public storefront: read only.
 drop policy if exists "public can read products" on public.products;
 create policy "public can read products"
 on public.products for select
@@ -95,7 +143,6 @@ on public.shop_settings for select
 to anon, authenticated
 using (true);
 
--- Admin-only writes.
 drop policy if exists "admins can insert products" on public.products;
 create policy "admins can insert products"
 on public.products for insert
@@ -122,37 +169,37 @@ to authenticated
 using (public.is_admin())
 with check (public.is_admin());
 
--- Public product/logo storage.
-insert into storage.buckets (id, name, public)
-values ('jk-assets', 'jk-assets', true)
+-- Public image bucket; only admins can upload/change/delete.
+insert into storage.buckets (id,name,public)
+values ('jk-assets','jk-assets',true)
 on conflict (id) do update set public = excluded.public;
 
 drop policy if exists "public can read jk assets" on storage.objects;
 create policy "public can read jk assets"
 on storage.objects for select
 to public
-using (bucket_id = 'jk-assets');
+using (bucket_id='jk-assets');
 
 drop policy if exists "admins can upload jk assets" on storage.objects;
 create policy "admins can upload jk assets"
 on storage.objects for insert
 to authenticated
-with check (bucket_id = 'jk-assets' and public.is_admin());
+with check (bucket_id='jk-assets' and public.is_admin());
 
 drop policy if exists "admins can update jk assets" on storage.objects;
 create policy "admins can update jk assets"
 on storage.objects for update
 to authenticated
-using (bucket_id = 'jk-assets' and public.is_admin())
-with check (bucket_id = 'jk-assets' and public.is_admin());
+using (bucket_id='jk-assets' and public.is_admin())
+with check (bucket_id='jk-assets' and public.is_admin());
 
 drop policy if exists "admins can delete jk assets" on storage.objects;
 create policy "admins can delete jk assets"
 on storage.objects for delete
 to authenticated
-using (bucket_id = 'jk-assets' and public.is_admin());
+using (bucket_id='jk-assets' and public.is_admin());
 
--- Initial products/settings seed. Existing IDs are preserved so carts/bookmarks remain stable.
+-- Seed only missing products. Existing rows are NEVER overwritten.
 insert into public.products (id,name,category,price,old_price,status,image,description,sort_order)
 values
 ('p1','Non-Tarnish Mini Necklace & Wrist Stack','Accessories',8500,10000,'available','assets/hero.jpg','Non-tarnish affordable shine. Stack them, gift them, keep them — the piece everyone keeps asking about.',1),
@@ -163,14 +210,18 @@ values
 ('p6','Nationwide Delivery','Services',0,null,'available','assets/order.jpg','From Katsina to every corner of Nigeria 🇳🇬. Packed, sealed and tracked until it lands — shipping quoted after your DM.',6)
 on conflict (id) do nothing;
 
+-- Only initialize blank/default settings. Do not overwrite settings you already changed.
 update public.shop_settings set
-  shop_name='Everything J&K',
-  tagline='Affordable fashion & lifestyle finds — imported in batches, packed with love, delivered nationwide.',
-  announcement='Prices changing soon! Secure your favourites at current prices ✨',
-  instagram='everything_j.k',
-  tiktok='everything_j.k',
-  email='kingkadooh@gmail.com',
-  whatsapp='',
-  location='Katsina, Nigeria',
-  delivery_note='Nationwide delivery across Nigeria 🇳🇬 — shipping is quoted after your DM.'
+  shop_name = case when coalesce(shop_name,'')='' then 'Everything J&K' else shop_name end,
+  tagline = case when coalesce(tagline,'')='' then 'Affordable fashion & lifestyle finds — imported in batches, packed with love, delivered nationwide.' else tagline end,
+  announcement = case when coalesce(announcement,'')='' then 'Prices changing soon! Secure your favourites at current prices ✨' else announcement end,
+  instagram = case when coalesce(instagram,'')='' then 'everything_j.k' else instagram end,
+  tiktok = case when coalesce(tiktok,'')='' then 'everything_j.k' else tiktok end,
+  email = case when coalesce(email,'')='' then 'kingkadooh@gmail.com' else email end,
+  location = case when coalesce(location,'')='' then 'Katsina, Nigeria' else location end,
+  delivery_note = case when coalesce(delivery_note,'')='' then 'Nationwide delivery across Nigeria 🇳🇬 — shipping is quoted after your DM.' else delivery_note end
 where id=1;
+
+-- Verification queries: these return data and let you confirm the setup.
+select count(*) as products_count from public.products;
+select id, shop_name, hero_logo_animation from public.shop_settings where id=1;

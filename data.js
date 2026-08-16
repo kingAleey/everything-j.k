@@ -1,7 +1,7 @@
 /* =====================================================
    EVERYTHING J&K — Store data
    Seeded from Instagram @everything_j.k (Katsina, Nigeria)
-   Initial fallback data only — live products and settings are stored in Supabase
+   Edit products via admin.html and download this file
    ===================================================== */
 window.JK_PRODUCTS = [
   {
@@ -75,7 +75,5 @@ window.JK_SETTINGS = {
   email: "kingkadooh@gmail.com",
   whatsapp: "",
   location: "Katsina, Nigeria",
-  deliveryNote: "Nationwide delivery across Nigeria 🇳🇬 — shipping is quoted after your DM.",
-  heroLogo: "",
-  heroLogoAnimation: "fade"
+  deliveryNote: "Nationwide delivery across Nigeria 🇳🇬 — shipping is quoted after your DM."
 };
