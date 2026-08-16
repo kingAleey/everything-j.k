@@ -23,6 +23,7 @@
     <div class="lock">🔐</div>
     <h1>EVERYTHING <span class="grad-text">J&K</span></h1>
     <p class="sub">Admin Control Panel — sign in to manage your store</p>
+    <input type="email" id="loginEmail" class="admin-input" placeholder="Admin email" autocomplete="username">
     <input type="password" id="loginPass" class="admin-input" placeholder="Enter admin password" autocomplete="current-password">
     <div class="login-err" id="loginErr"></div>
     <button class="glow-btn btn-primary" id="loginBtn" style="width:100%;margin-top:.6rem">UNLOCK PANEL</button>
@@ -190,6 +191,7 @@
 
 <div class="toast" id="toast"></div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="data.js"></script>
 <script src="admin.js"></script>
 </body>

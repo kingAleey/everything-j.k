@@ -5,7 +5,14 @@
 (function () {
   "use strict";
 
-  var DEFAULT_PASS = "jk2026";
+  /* ---------- Supabase ---------- */
+  var SUPABASE_URL = "https://myrshzdfhrxjaqsitjkn.supabase.co";
+  var SUPABASE_PUBLISHABLE_KEY = "sb_publishable_C87X56f2AqzWSRQBj2-RQA_lwHdU74B";
+  var sb = null;
+  if (window.supabase && window.supabase.createClient) {
+    sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+  }
+
   var STORE = {
     products: (function () {
       try { return JSON.parse(localStorage.getItem("jk_products") || "null") || window.JK_PRODUCTS; }
@@ -30,50 +37,43 @@
     return { available: ["available", "Available"], sold: ["sold", "Sold Out"], coming: ["coming", "Coming Soon"] }[s] || ["available", "Available"];
   }
 
-  /* ---------- Hashing (SHA-256) ---------- */
-  async function sha256(str) {
-    if (crypto.subtle) {
-      var buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(str));
-      return Array.from(new Uint8Array(buf)).map(function (b) { return b.toString(16).padStart(2, "0"); }).join("");
-    }
-    var h = 0, i, chr;
-    for (i = 0; i < str.length; i++) { chr = str.charCodeAt(i); h = ((h << 5) - h) + chr; h |= 0; }
-    return "fallback-" + Math.abs(h);
-  }
-  function getStoredHash() { return localStorage.getItem("jk_admin_hash") || ""; }
-
   /* ---------- Toast ---------- */
   var toastTimer = null;
   function toast(msg, isErr) {
     var t = $("toast");
+    if (!t) return;
     t.textContent = msg;
     t.className = "toast show" + (isErr ? " error" : "");
     clearTimeout(toastTimer);
     toastTimer = setTimeout(function () { t.className = "toast"; }, 2600);
   }
 
-  /* ---------- Auth ---------- */
-  async function tryLogin(pass) {
-    var hash = getStoredHash();
-    var ok;
-    if (hash) ok = (await sha256(pass)) === hash;
-    else ok = pass === DEFAULT_PASS;
-    if (ok) {
-      sessionStorage.setItem("jk_admin_ok", "1");
-      showDash();
-      toast("🔓 Welcome back, boss!");
-    } else {
-      $("loginErr").textContent = "❌ Wrong password. Try again.";
+  /* ---------- Supabase Auth ---------- */
+  async function tryLogin(email, pass) {
+    if (!sb) {
+      $("loginErr").textContent = "❌ Supabase could not load. Check your internet connection.";
+      return;
     }
+    $("loginErr").textContent = "";
+    var result = await sb.auth.signInWithPassword({ email: email.trim(), password: pass });
+    if (result.error) {
+      $("loginErr").textContent = "❌ " + result.error.message;
+      return;
+    }
+    showDash();
+    toast("🔓 Welcome back, boss!");
   }
-  function logout() {
-    sessionStorage.removeItem("jk_admin_ok");
+
+  async function logout() {
+    if (sb) await sb.auth.signOut();
     showLogin();
   }
+
   function showLogin() {
     $("loginView").classList.remove("hidden");
     $("dashView").classList.add("hidden");
   }
+
   function showDash() {
     $("loginView").classList.add("hidden");
     $("dashView").classList.remove("hidden");
@@ -331,15 +331,14 @@
 
   /* ---------- Password ---------- */
   async function changePass() {
-    var cur = $("curPass").value, nw = $("newPass").value, nw2 = $("newPass2").value;
-    var hash = getStoredHash();
-    var curOk = hash ? (await sha256(cur)) === hash : cur === DEFAULT_PASS;
-    if (!curOk) { toast("Current password is wrong.", true); return; }
+    var nw = $("newPass").value, nw2 = $("newPass2").value;
+    if (!sb) { toast("Supabase is unavailable.", true); return; }
     if (nw.length < 6) { toast("New password must be at least 6 characters.", true); return; }
     if (nw !== nw2) { toast("Passwords don't match.", true); return; }
-    localStorage.setItem("jk_admin_hash", await sha256(nw));
+    var result = await sb.auth.updateUser({ password: nw });
+    if (result.error) { toast(result.error.message, true); return; }
     $("curPass").value = $("newPass").value = $("newPass2").value = "";
-    toast("🔑 Password updated!");
+    toast("🔑 Password updated in Supabase!");
   }
 
   /* ---------- Export data.js ---------- */
@@ -374,12 +373,25 @@
   }
 
   /* ---------- Init ---------- */
-  function init() {
-    if (sessionStorage.getItem("jk_admin_ok")) showDash(); else showLogin();
+  async function init() {
     initTabs();
-    $("loginBtn").addEventListener("click", function () { tryLogin($("loginPass").value); });
-    $("loginPass").addEventListener("keydown", function (e) { if (e.key === "Enter") tryLogin($("loginPass").value); });
+    $("loginBtn").addEventListener("click", function () { tryLogin($("loginEmail").value, $("loginPass").value); });
+    $("loginPass").addEventListener("keydown", function (e) { if (e.key === "Enter") tryLogin($("loginEmail").value, $("loginPass").value); });
     $("logoutBtn").addEventListener("click", logout);
+
+    if (!sb) {
+      showLogin();
+      $("loginErr").textContent = "❌ Supabase could not load.";
+      return;
+    }
+
+    var sessionResult = await sb.auth.getSession();
+    if (sessionResult.data && sessionResult.data.session) showDash();
+    else showLogin();
+
+    sb.auth.onAuthStateChange(function (_event, session) {
+      if (session) showDash(); else showLogin();
+    });
     $("saveBtn").addEventListener("click", saveProduct);
     $("resetFormBtn").addEventListener("click", resetForm);
     $("saveSettingsBtn").addEventListener("click", saveSettings);
