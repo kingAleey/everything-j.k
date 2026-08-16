@@ -151,9 +151,32 @@
   async function deleteProduct(id){if(!confirm("Delete this product permanently?"))return;var p=STORE.products.find(function(x){return x.id===id;});var r=await sb.from("products").delete().eq("id",id);if(r.error){toast("Delete failed: "+r.error.message,true);return;}if(p&&p.image&&p.image.indexOf("/storage/v1/object/public/jk-assets/")>-1){try{var path=p.image.split("/jk-assets/")[1];await sb.storage.from("jk-assets").remove([path]);}catch(e){}}if(editingId===id)resetForm();await loadData();renderList();toast("🗑 Product deleted globally.");}
 
   function setLogo(src){currentLogo=src||"";if(currentLogo){$("sLogoPreview").src=currentLogo;$("sLogoPreview").classList.remove("hidden");$("logoPh").classList.add("hidden");}else{$("sLogoPreview").classList.add("hidden");$("logoPh").classList.remove("hidden");}}
-  function handleLogoFile(file){
+  async function handleLogoFile(file){
     if(!file||!file.type.match(/^image\//)){toast("Please choose an image file.",true);return;}
-    var reader=new FileReader();reader.onload=function(ev){var img=new Image();img.onload=async function(){var max=1100,w=img.width,h=img.height;if(w>max||h>max){var r=Math.min(max/w,max/h);w=Math.round(w*r);h=Math.round(h*r);}var cv=document.createElement("canvas");cv.width=w;cv.height=h;var ctx=cv.getContext("2d");ctx.drawImage(img,0,0,w,h);var data=img.src;try{var url=await uploadAsset(data,"logos",file.type.indexOf("png")>=0?"png":"jpg");setLogo(url);toast("✨ Logo uploaded. Choose an animation and save settings.");}catch(e){toast("Logo upload failed: "+e.message,true);}};img.src=ev.target.result;};reader.readAsDataURL(file);
+    if(file.size>12*1024*1024){toast("Please choose a logo smaller than 12MB.",true);return;}
+    try{
+      var bitmap=await createImageBitmap(file);
+      var max=900,w=bitmap.width,h=bitmap.height;
+      if(w>max||h>max){var scale=Math.min(max/w,max/h);w=Math.max(1,Math.round(w*scale));h=Math.max(1,Math.round(h*scale));}
+      var cv=document.createElement("canvas");cv.width=w;cv.height=h;
+      var ctx=cv.getContext("2d");ctx.clearRect(0,0,w,h);ctx.drawImage(bitmap,0,0,w,h);
+      if(bitmap.close) bitmap.close();
+      var isPng=/png|webp/i.test(file.type);
+      var mime=isPng?"image/png":"image/jpeg";
+      var quality=isPng?undefined:.82;
+      var dataUrl=await new Promise(function(resolve,reject){cv.toBlob(function(blob){
+        if(!blob){reject(new Error("Could not prepare the logo."));return;}
+        if(blob.size>800000){reject(new Error("Logo is too large after resizing. Please use a smaller image."));return;}
+        var r=new FileReader();r.onload=function(){resolve(r.result);};r.onerror=function(){reject(new Error("Could not read the prepared logo."));};r.readAsDataURL(blob);
+      },mime,quality);});
+      // Keep this frontend-only: store the prepared logo string in the existing hero_logo field.
+      // No Storage bucket, SQL, RLS, Auth, or database schema changes are required.
+      setLogo(dataUrl);
+      toast("✨ Logo uploaded. Choose an animation and save settings.");
+    }catch(e){
+      console.error("Logo preparation failed",e);
+      toast("Logo upload failed: "+(e&&e.message?e.message:"Please try another image."),true);
+    }
   }
   function fillSettings(){var s=STORE.settings;$("sShopName").value=s.shopName||"";$("sTagline").value=s.tagline||"";$("sAnnouncement").value=s.announcement||"";$("sLocation").value=s.location||"";$("sDeliveryNote").value=s.deliveryNote||"";$("sInstagram").value=s.instagram||"";$("sTikTok").value=s.tiktok||"";$("sEmail").value=s.email||"";$("sWhatsapp").value=s.whatsapp||"";$("sLogoAnimation").value=s.heroLogoAnimation||"fade";setLogo(s.heroLogo||"");}
   async function saveSettings(){
