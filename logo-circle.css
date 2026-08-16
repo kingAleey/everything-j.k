@@ -1,0 +1,10 @@
+/* ONLY change: show the uploaded homepage logo as a circle in the admin preview. */
+#sLogoPreview {
+  width: 120px;
+  height: 120px;
+  object-fit: cover;
+  border-radius: 50%;
+  display: block;
+  margin: 0 auto;
+  overflow: hidden;
+}
