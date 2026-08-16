@@ -152,27 +152,38 @@
 
   function setLogo(src){currentLogo=src||"";if(currentLogo){$("sLogoPreview").src=currentLogo;$("sLogoPreview").classList.remove("hidden");$("logoPh").classList.add("hidden");}else{$("sLogoPreview").classList.add("hidden");$("logoPh").classList.remove("hidden");}}
   async function handleLogoFile(file){
-    if(!file||!file.type.match(/^image\//)){toast("Please choose an image file.",true);return;}
-    if(file.size>12*1024*1024){toast("Please choose a logo smaller than 12MB.",true);return;}
+    if(!file || !file.type || file.type.indexOf("image/") !== 0){toast("Please choose an image file.",true);return;}
+    if(file.size > 12*1024*1024){toast("Please choose a logo smaller than 12MB.",true);return;}
     try{
-      var bitmap=await createImageBitmap(file);
-      var max=900,w=bitmap.width,h=bitmap.height;
-      if(w>max||h>max){var scale=Math.min(max/w,max/h);w=Math.max(1,Math.round(w*scale));h=Math.max(1,Math.round(h*scale));}
-      var cv=document.createElement("canvas");cv.width=w;cv.height=h;
-      var ctx=cv.getContext("2d");ctx.clearRect(0,0,w,h);ctx.drawImage(bitmap,0,0,w,h);
-      if(bitmap.close) bitmap.close();
-      var isPng=/png|webp/i.test(file.type);
-      var mime=isPng?"image/png":"image/jpeg";
-      var quality=isPng?undefined:.82;
-      var dataUrl=await new Promise(function(resolve,reject){cv.toBlob(function(blob){
-        if(!blob){reject(new Error("Could not prepare the logo."));return;}
-        if(blob.size>800000){reject(new Error("Logo is too large after resizing. Please use a smaller image."));return;}
-        var r=new FileReader();r.onload=function(){resolve(r.result);};r.onerror=function(){reject(new Error("Could not read the prepared logo."));};r.readAsDataURL(blob);
-      },mime,quality);});
-      // Keep this frontend-only: store the prepared logo string in the existing hero_logo field.
-      // No Storage bucket, SQL, RLS, Auth, or database schema changes are required.
+      var dataUrl = await new Promise(function(resolve,reject){
+        var reader = new FileReader();
+        reader.onload = function(){
+          var img = new Image();
+          img.onload = function(){
+            try{
+              var max=1200,w=img.naturalWidth||img.width,h=img.naturalHeight||img.height;
+              if(!w||!h){reject(new Error("Could not read the logo dimensions."));return;}
+              var scale=Math.min(1,max/Math.max(w,h));
+              var nw=Math.max(1,Math.round(w*scale)),nh=Math.max(1,Math.round(h*scale));
+              var cv=document.createElement("canvas");cv.width=nw;cv.height=nh;
+              var ctx=cv.getContext("2d");if(!ctx){reject(new Error("Your browser could not prepare the logo."));return;}
+              ctx.clearRect(0,0,nw,nh);ctx.drawImage(img,0,0,nw,nh);
+              var mime=/png|webp/i.test(file.type)?"image/png":"image/jpeg";
+              var quality=mime==="image/png"?undefined:.88;
+              cv.toBlob(function(blob){
+                if(!blob){reject(new Error("Could not prepare the logo."));return;}
+                var fr=new FileReader();fr.onload=function(){resolve(fr.result);};fr.onerror=function(){reject(new Error("Could not read the prepared logo."));};fr.readAsDataURL(blob);
+              },mime,quality);
+            }catch(err){reject(err);}
+          };
+          img.onerror=function(){reject(new Error("Could not open that logo image."));};
+          img.src=reader.result;
+        };
+        reader.onerror=function(){reject(new Error("Could not read the selected logo."));};
+        reader.readAsDataURL(file);
+      });
       setLogo(dataUrl);
-      toast("✨ Logo uploaded. Choose an animation and save settings.");
+      toast("✨ Logo ready. Press Save Settings to publish it.");
     }catch(e){
       console.error("Logo preparation failed",e);
       toast("Logo upload failed: "+(e&&e.message?e.message:"Please try another image."),true);
@@ -197,7 +208,13 @@
     $("imgDrop").addEventListener("click",function(){$("fImgFile").click();});$("fImgFile").addEventListener("change",function(e){if(e.target.files[0])openCropper(e.target.files[0]);e.target.value="";});
     $("cropApply").textContent="📤 Upload Picture";
     $("cropCancel").addEventListener("click",function(){$("cropBackdrop").classList.add("hidden");});$("cropApply").addEventListener("click",applyCrop);$("cropReset").addEventListener("click",resetCrop);$("cropZoom").addEventListener("input",function(){cropState.zoom=Number(this.value);drawCrop();});$("cropCanvas").addEventListener("pointerdown",handleCropPointerDown);$("cropCanvas").addEventListener("pointermove",handleCropPointerMove);$("cropCanvas").addEventListener("pointerup",handleCropPointerUp);$("cropCanvas").addEventListener("pointercancel",handleCropPointerUp);
-    $("logoDrop").addEventListener("click",function(){$("sLogoFile").click();});$("sLogoFile").addEventListener("change",function(e){if(e.target.files[0])handleLogoFile(e.target.files[0]);e.target.value="";});
+    var logoDrop=$("logoDrop"), logoFile=$("sLogoFile");
+    if(logoDrop && logoFile){
+      logoDrop.setAttribute("role","button");logoDrop.setAttribute("tabindex","0");
+      logoDrop.addEventListener("click",function(e){if(e.target!==logoFile)logoFile.click();});
+      logoDrop.addEventListener("keydown",function(e){if(e.key==="Enter"||e.key===" "){e.preventDefault();logoFile.click();}});
+      logoFile.addEventListener("change",function(e){var file=e.target.files&&e.target.files[0];if(file)handleLogoFile(file);setTimeout(function(){e.target.value="";},0);});
+    }
     var sr=await sb.auth.getSession();if(sr.data&&sr.data.session){try{await loadData();showDash();}catch(e){showLogin();$("loginErr").textContent="❌ Admin account is authenticated but not authorized yet. Set app_metadata role to admin in Supabase.";}}else showLogin();
     sb.auth.onAuthStateChange(async function(event,session){if(session&&event!=="SIGNED_OUT"){try{await loadData();showDash();}catch(e){showLogin();}}else if(!session)showLogin();});
   }
