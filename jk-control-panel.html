@@ -37,7 +37,7 @@
     <h1>⚙ <span>EVERYTHING J&K</span> — STORE MANAGER</h1>
     <div class="actions">
       <a href="index.html" class="small-btn">🛍 View Store</a>
-      <button class="small-btn green" id="exportBtn">⬇ Export data.js</button>
+      <button class="small-btn green" id="exportBtn">⬇ Export backup</button>
       <button class="small-btn red" id="logoutBtn">Log out</button>
     </div>
   </div>
@@ -154,7 +154,7 @@
       <label class="flabel">Confirm new password</label>
       <input type="password" class="admin-input" id="newPass2">
       <button class="glow-btn btn-primary" id="changePassBtn" style="margin-top:1.4rem">🔑 Update Password</button>
-      <p style="color:var(--muted);font-size:.78rem;margin-top:1rem">Default password: <code style="color:var(--cyan)">jk2026</code> — change it once you're in!</p>
+      <p style="color:var(--muted);font-size:.78rem;margin-top:1rem">Your password is managed by Supabase Auth. Use a strong unique password and change it here when needed.</p>
     </div>
   </div>
 
@@ -166,7 +166,7 @@
         <b style="color:#fff">1. Add / edit products</b> — fill the form, click <b style="color:var(--green)">Save Product</b>.<br>
         <b style="color:#fff">2. Pictures</b> — click the dashed box to upload; images are auto-compressed. You can also paste any image URL into the <i>name</i> field's place — no wait, use the upload box.<br>
         <b style="color:#fff">3. Price 0</b> — shows "Price on DM 💬" on the store. Perfect for preorders.<br>
-        <b style="color:#fff">4. Publish your changes</b> — after editing, click <b style="color:var(--green)">⬇ Export data.js</b> and replace the <code style="color:var(--cyan)">data.js</code> file in this folder (or re-upload it where your site is hosted). Your own browser previews changes instantly; the exported file is what visitors see.<br>
+        <b style="color:#fff">4. Save globally</b> — product and settings changes are saved to the shared Supabase database and appear on the live store for everyone. No data.js replacement is required.<br>
         <b style="color:#fff">5. Checkout</b> — customers' carts redirect to your Instagram DM with the order summary copied. 💌
       </p>
     </div>

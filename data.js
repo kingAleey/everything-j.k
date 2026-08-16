@@ -1,7 +1,7 @@
 /* =====================================================
    EVERYTHING J&K — Store data
    Seeded from Instagram @everything_j.k (Katsina, Nigeria)
-   Edit products via admin.html and download this file
+   Initial fallback data only — live products and settings are stored in Supabase
    ===================================================== */
 window.JK_PRODUCTS = [
   {

@@ -179,7 +179,7 @@
     <div class="soc" id="socialLinks"></div>
     <p>© <span id="year"></span> <b style="color:#fff" id="footerShopName">Everything J&amp;K</b> • <span id="footerLocation">Katsina, Nigeria</span> 🇳🇬</p>
     <p style="margin-top:.4rem;font-size:.75rem">Follow <a href="https://www.instagram.com/everything_j.k/" target="_blank" rel="noopener" id="footerIg" style="color:var(--cyan);text-decoration:none">@everything_j.k</a> on Instagram for drop alerts.</p>
-    <a href="admin.html" class="admin-link">⚙ Admin Panel</a>
+    <a href="jk-control-panel.html" class="admin-link">⚙ Admin Panel</a>
   </div>
 </footer>
 
@@ -215,121 +215,14 @@
 
 <div class="toast" id="toast"></div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="data.js"></script>
 <script src="store.js"></script>
 
 
 
 
-<script>
-/* =====================================================
-   WORKING NAVIGATION
-   Desktop + mobile generated nav buttons
-   ===================================================== */
-(function () {
-  const targets = {
-    home: 'home',
-    shop: 'shop',
-    drops: 'shop',
-    collection: 'shop',
-    products: 'shop',
-    'shop the drops': 'shop',
 
-    services: 'how',
-    service: 'how',
-    process: 'how',
-    'how it works': 'how',
-    how: 'how',
-
-    why: 'why',
-    'why j&k': 'why',
-
-    about: 'about',
-    story: 'about',
-    'our story': 'about',
-
-    contact: 'contact',
-    'contact us': 'contact'
-  };
-
-  function clean(text) {
-    return (text || '')
-      .replace(/\s+/g, ' ')
-      .trim()
-      .toLowerCase();
-  }
-
-  function navigate(id) {
-    const target = document.getElementById(id);
-    if (!target) return false;
-
-    const nav = document.querySelector('nav');
-    const navHeight = nav ? nav.getBoundingClientRect().height : 0;
-
-    const announcement = document.querySelector('.announce');
-    const announcementHeight =
-      announcement && getComputedStyle(announcement).display !== 'none'
-        ? announcement.getBoundingClientRect().height
-        : 0;
-
-    const offset = navHeight + announcementHeight + 14;
-    const top = target.getBoundingClientRect().top + window.scrollY - offset;
-
-    window.scrollTo({
-      top: Math.max(0, top),
-      behavior: 'smooth'
-    });
-
-    history.replaceState(null, '', '#' + id);
-    return true;
-  }
-
-  /* Handles buttons generated later by data.js/store.js too. */
-  document.addEventListener('click', function (event) {
-    const element = event.target.closest(
-      '#catNav button, #catNav a, #mobileCats button, #mobileCats a'
-    );
-
-    if (!element) return;
-
-    const label = clean(element.textContent);
-    const targetId = targets[label];
-
-    if (!targetId) return;
-
-    event.preventDefault();
-    event.stopPropagation();
-
-    navigate(targetId);
-
-    /* Close mobile dropdown after navigation */
-    const mobileCats = document.getElementById('mobileCats');
-    if (mobileCats) mobileCats.classList.remove('open');
-  }, true);
-
-  /* Also support normal href="#section" navigation. */
-  document.addEventListener('click', function (event) {
-    const link = event.target.closest('nav a[href^="#"]');
-    if (!link) return;
-
-    const id = link.getAttribute('href').slice(1);
-    if (!document.getElementById(id)) return;
-
-    event.preventDefault();
-    event.stopPropagation();
-    navigate(id);
-  }, true);
-
-  /* Make the hero Shop the Drops button work consistently. */
-  document.addEventListener('click', function (event) {
-    const link = event.target.closest('a[href="#shop"]');
-    if (!link) return;
-
-    event.preventDefault();
-    navigate('shop');
-  }, true);
-})();
-</script>
 
 </body>
 </html>

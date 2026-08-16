@@ -1,0 +1,60 @@
+EVERYTHING J&K — FINAL DEPLOYMENT
+
+FILES TO UPLOAD
+- index.html
+- jk-control-panel.html
+- store.js
+- admin.js
+- data.js
+- style.css
+- mobile-fix.css
+- admin.css
+- supabase.sql
+- assets/ (folder)
+
+1) SUPABASE DATABASE
+Open Supabase > SQL Editor > New query.
+Paste ALL of supabase.sql and Run.
+
+2) ADMIN AUTHORIZATION
+You already created the admin user in Supabase Authentication > Users.
+For that user, open its details and set Raw App Metadata to:
+{"role":"admin"}
+
+Do NOT put this in User Metadata. It must be App Metadata.
+
+3) ADMIN LOGIN
+Open:
+https://YOUR-DOMAIN/jk-control-panel.html
+
+Use the SAME email/password you created in Supabase Authentication.
+The old local password (jk2026) is no longer used.
+
+4) GLOBAL PRODUCT UPDATES
+Admin product edits, additions and deletions now save to Supabase.
+The public site reads Supabase, so visitors see the same products.
+
+5) GLOBAL SHOP SETTINGS
+Contact details, announcement, delivery note, logo and logo animation save to Supabase.
+
+6) PRODUCT IMAGE CROP
+Upload a product image in the admin panel.
+The crop editor uses the homepage product-card ratio (10:11).
+Drag the image, zoom, then choose “Use this crop”.
+The cropped image is uploaded to Supabase Storage.
+
+7) HOMEPAGE LOGO
+Upload a logo in Store Settings, choose an animation, then Save Settings.
+The live homepage loads it from Supabase Storage.
+
+8) SECURITY
+The frontend uses the Supabase publishable key only.
+Never add a Supabase secret/service-role key to these files.
+Database writes and storage uploads are restricted by Row Level Security to users whose Auth App Metadata role is admin.
+
+9) NETLIFY
+Push the final files/folder to GitHub and let Netlify redeploy.
+No Netlify environment variable is required for this version because the public Supabase URL and publishable key are safe client configuration when RLS is correctly enabled.
+
+10) DOMAIN / TRUEHOST LATER
+Keep the site hosted on Netlify if you want. Buy the domain from Truehost and point its DNS to Netlify. The Supabase database does not need to move.
