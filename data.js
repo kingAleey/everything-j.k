@@ -75,5 +75,7 @@ window.JK_SETTINGS = {
   email: "kingkadooh@gmail.com",
   whatsapp: "",
   location: "Katsina, Nigeria",
-  deliveryNote: "Nationwide delivery across Nigeria 🇳🇬 — shipping is quoted after your DM."
+  deliveryNote: "Nationwide delivery across Nigeria 🇳🇬 — shipping is quoted after your DM.",
+  heroLogo: "",
+  heroLogoAnimation: "fade"
 };

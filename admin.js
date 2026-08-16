@@ -17,6 +17,8 @@
     })()
   };
   var editingId = null;
+  var cropState = { img: null, zoom: 1, x: 0, y: 0, baseScale: 1, startX: 0, startY: 0, dragging: false };
+  var currentLogo = "";
 
   function $(id) { return document.getElementById(id); }
   function esc(s) {
@@ -50,47 +52,21 @@
     toastTimer = setTimeout(function () { t.className = "toast"; }, 2600);
   }
 
-  /* ---------- Supabase data + Auth ---------- */
-  async function loadRemoteData() {
-    if (!window.jkSupabase) return;
-    var pr = await window.jkSupabase.from("products").select("*").order("updated_at", { ascending: false });
-    if (pr.error) throw pr.error;
-    STORE.products = (pr.data || []).map(function (p) {
-      return { id:p.id, name:p.name, category:p.category, price:Number(p.price)||0, oldPrice:p.old_price == null ? null : Number(p.old_price), status:p.status, image:p.image, desc:p.description || "" };
-    });
-    var sr = await window.jkSupabase.from("shop_settings").select("*").eq("id",1).maybeSingle();
-    if (sr.error) throw sr.error;
-    if (sr.data) {
-      STORE.settings = {
-        shopName:sr.data.shop_name, tagline:sr.data.tagline, announcement:sr.data.announcement,
-        location:sr.data.location, deliveryNote:sr.data.delivery_note, instagram:sr.data.instagram,
-        tiktok:sr.data.tiktok, email:sr.data.email, whatsapp:sr.data.whatsapp
-      };
-    }
-  }
-
-  async function tryLogin(email, pass) {
-    if (window.jkSupabase) {
-      var result = await window.jkSupabase.auth.signInWithPassword({ email: email, password: pass });
-      if (result.error) {
-        $("loginErr").textContent = "❌ " + result.error.message;
-        return;
-      }
+  /* ---------- Auth ---------- */
+  async function tryLogin(pass) {
+    var hash = getStoredHash();
+    var ok;
+    if (hash) ok = (await sha256(pass)) === hash;
+    else ok = pass === DEFAULT_PASS;
+    if (ok) {
       sessionStorage.setItem("jk_admin_ok", "1");
-      try { await loadRemoteData(); } catch (e) { toast("Could not load the online store data.", true); }
       showDash();
       toast("🔓 Welcome back, boss!");
-      return;
+    } else {
+      $("loginErr").textContent = "❌ Wrong password. Try again.";
     }
-    /* Local fallback for offline development only. */
-    var hash = getStoredHash();
-    var ok = hash ? (await sha256(pass)) === hash : pass === DEFAULT_PASS;
-    if (ok) { sessionStorage.setItem("jk_admin_ok", "1"); showDash(); }
-    else $("loginErr").textContent = "❌ Wrong password. Try again.";
   }
-
-  async function logout() {
-    if (window.jkSupabase) await window.jkSupabase.auth.signOut();
+  function logout() {
     sessionStorage.removeItem("jk_admin_ok");
     showLogin();
   }
@@ -98,24 +74,18 @@
     $("loginView").classList.remove("hidden");
     $("dashView").classList.add("hidden");
   }
-  async function showDash() {
+  function showDash() {
     $("loginView").classList.add("hidden");
     $("dashView").classList.remove("hidden");
-    try { await loadRemoteData(); } catch (e) { console.warn(e); }
     renderList();
     fillSettings();
   }
 
   /* ---------- Product CRUD ---------- */
-  async function persistProducts() {
-    if (!window.jkSupabase) { localStorage.setItem("jk_products", JSON.stringify(STORE.products)); return; }
-    var rows = STORE.products.map(function (p) {
-      return { id:p.id, name:p.name, category:p.category || "General", price:Number(p.price)||0, old_price:p.oldPrice == null ? null : Number(p.oldPrice), status:p.status || "available", image:p.image || "", description:p.desc || "", updated_at:new Date().toISOString() };
-    });
-    var result = await window.jkSupabase.from("products").upsert(rows, { onConflict:"id" });
-    if (result.error) throw result.error;
+  function persistProducts() {
+    localStorage.setItem("jk_products", JSON.stringify(STORE.products));
   }
-  async function saveProduct(e) {
+  function saveProduct(e) {
     e.preventDefault();
     var name = $("fName").value.trim();
     if (!name) { toast("Please enter a product name.", true); return; }
@@ -137,7 +107,7 @@
     } else {
       STORE.products.push(obj);
     }
-    try { await persistProducts(); } catch (err) { toast("❌ Could not save to the online database: " + err.message, true); return; }
+    persistProducts();
     editingId = null;
     resetForm();
     renderList();
@@ -157,20 +127,13 @@
     setImage(p.image);
     $("tab-products").scrollIntoView({ behavior: "smooth", block: "start" });
   }
-  async function deleteProduct(id) {
+  function deleteProduct(id) {
     if (!confirm("Delete this product permanently?")) return;
     STORE.products = STORE.products.filter(function (x) { return x.id !== id; });
     if (editingId === id) resetForm();
-    try {
-      if (window.jkSupabase) {
-        var result = await window.jkSupabase.from("products").delete().eq("id", id);
-        if (result.error) throw result.error;
-      } else {
-        await persistProducts();
-      }
-      renderList();
-      toast("🗑 Product deleted.");
-    } catch (err) { toast("❌ Could not delete online: " + err.message, true); }
+    persistProducts();
+    renderList();
+    toast("🗑 Product deleted.");
   }
   function resetForm() {
     editingId = null;
@@ -212,7 +175,7 @@
     });
   }
 
-  /* ---------- Image upload + compression ---------- */
+  /* ---------- Product image upload + exact crop ---------- */
   var currentImage = "";
   function setImage(src) {
     currentImage = src || "";
@@ -225,27 +188,109 @@
       $("imgPh").classList.remove("hidden");
     }
   }
-  function handleFile(file) {
+
+  function openCropper(file) {
     if (!file || !file.type.match(/^image\//)) { toast("Please choose an image file.", true); return; }
     var reader = new FileReader();
     reader.onload = function (ev) {
       var img = new Image();
       img.onload = function () {
-        var MAX = 900;
-        var w = img.width, h = img.height;
-        if (w > MAX || h > MAX) {
-          var r = Math.min(MAX / w, MAX / h);
-          w = Math.round(w * r); h = Math.round(h * r);
-        }
-        var cv = document.createElement("canvas");
-        cv.width = w; cv.height = h;
-        cv.getContext("2d").drawImage(img, 0, 0, w, h);
-        var dataUrl = cv.toDataURL("image/jpeg", 0.82);
-        if (dataUrl.length > 2300000) { toast("Image too big after compression — try a smaller one.", true); return; }
-        setImage(dataUrl);
-        toast("🖼 Image added (compressed).");
+        cropState.img = img;
+        cropState.zoom = 1;
+        cropState.x = 0;
+        cropState.y = 0;
+        $("cropZoom").value = "1";
+        $("cropBackdrop").classList.remove("hidden");
+        drawCrop();
       };
       img.onerror = function () { toast("Could not read that image.", true); };
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function drawCrop() {
+    var c = $("cropCanvas"), ctx = c.getContext("2d"), img = cropState.img;
+    if (!img) return;
+    var cw = c.width, ch = c.height;
+    ctx.clearRect(0, 0, cw, ch);
+    ctx.fillStyle = "#05060b";
+    ctx.fillRect(0, 0, cw, ch);
+    var cover = Math.max(cw / img.width, ch / img.height);
+    var scale = cover * cropState.zoom;
+    var dw = img.width * scale, dh = img.height * scale;
+    var x = (cw - dw) / 2 + cropState.x;
+    var y = (ch - dh) / 2 + cropState.y;
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(img, x, y, dw, dh);
+  }
+
+  function resetCrop() {
+    cropState.zoom = 1; cropState.x = 0; cropState.y = 0;
+    $("cropZoom").value = "1";
+    drawCrop();
+  }
+
+  function applyCrop() {
+    var c = $("cropCanvas");
+    var dataUrl = c.toDataURL("image/jpeg", 0.86);
+    if (dataUrl.length > 2300000) { toast("Crop is still too large — reduce the zoom or use a smaller image.", true); return; }
+    setImage(dataUrl);
+    $("cropBackdrop").classList.add("hidden");
+    toast("✂️ Crop saved exactly as shown.");
+  }
+
+  function handleCropPointerDown(e) {
+    if (!cropState.img) return;
+    cropState.dragging = true;
+    cropState.startX = e.clientX - cropState.x;
+    cropState.startY = e.clientY - cropState.y;
+    $("cropCanvas").classList.add("dragging");
+    $("cropCanvas").setPointerCapture(e.pointerId);
+  }
+  function handleCropPointerMove(e) {
+    if (!cropState.dragging) return;
+    cropState.x = e.clientX - cropState.startX;
+    cropState.y = e.clientY - cropState.startY;
+    drawCrop();
+  }
+  function handleCropPointerUp() {
+    cropState.dragging = false;
+    $("cropCanvas").classList.remove("dragging");
+  }
+
+  /* ---------- Homepage logo upload ---------- */
+  function setLogo(src) {
+    currentLogo = src || "";
+    if (currentLogo) {
+      $("sLogoPreview").src = currentLogo;
+      $("sLogoPreview").classList.remove("hidden");
+      $("logoPh").classList.add("hidden");
+    } else {
+      $("sLogoPreview").classList.add("hidden");
+      $("logoPh").classList.remove("hidden");
+    }
+  }
+  function handleLogoFile(file) {
+    if (!file || !file.type.match(/^image\//)) { toast("Please choose an image file.", true); return; }
+    var reader = new FileReader();
+    reader.onload = function (ev) {
+      var img = new Image();
+      img.onload = function () {
+        var MAX = 1100, w = img.width, h = img.height;
+        if (w > MAX || h > MAX) { var r = Math.min(MAX / w, MAX / h); w = Math.round(w * r); h = Math.round(h * r); }
+        var cv = document.createElement("canvas"); cv.width = w; cv.height = h;
+        var ctx = cv.getContext("2d"); ctx.drawImage(img, 0, 0, w, h);
+        var png = cv.toDataURL("image/png");
+        if (png.length > 2300000) {
+          var jpg = cv.toDataURL("image/jpeg", .86);
+          if (jpg.length > 2300000) { toast("Logo is too large after compression.", true); return; }
+          setLogo(jpg);
+        } else setLogo(png);
+        toast("✨ Logo uploaded. Choose an animation and save settings.");
+      };
+      img.onerror = function () { toast("Could not read that logo.", true); };
       img.src = ev.target.result;
     };
     reader.readAsDataURL(file);
@@ -263,8 +308,10 @@
     $("sTikTok").value = s.tiktok || "";
     $("sEmail").value = s.email || "";
     $("sWhatsapp").value = s.whatsapp || "";
+    $("sLogoAnimation").value = s.heroLogoAnimation || "fade";
+    setLogo(s.heroLogo || "");
   }
-  async function saveSettings() {
+  function saveSettings() {
     STORE.settings = {
       shopName: $("sShopName").value.trim(),
       tagline: $("sTagline").value.trim(),
@@ -274,35 +321,24 @@
       instagram: $("sInstagram").value.trim().replace(/^@/, ""),
       tiktok: $("sTikTok").value.trim().replace(/^@/, ""),
       email: $("sEmail").value.trim(),
-      whatsapp: $("sWhatsapp").value.trim()
+      whatsapp: $("sWhatsapp").value.trim(),
+      heroLogo: currentLogo,
+      heroLogoAnimation: $("sLogoAnimation").value || "fade"
     };
-    try {
-      if (window.jkSupabase) {
-        var result = await window.jkSupabase.from("shop_settings").upsert({
-          id:1, shop_name:STORE.settings.shopName, tagline:STORE.settings.tagline, announcement:STORE.settings.announcement,
-          location:STORE.settings.location, delivery_note:STORE.settings.deliveryNote, instagram:STORE.settings.instagram,
-          tiktok:STORE.settings.tiktok, email:STORE.settings.email, whatsapp:STORE.settings.whatsapp, updated_at:new Date().toISOString()
-        }, { onConflict:"id" });
-        if (result.error) throw result.error;
-      } else {
-        localStorage.setItem("jk_settings", JSON.stringify(STORE.settings));
-      }
-      toast("✅ Settings saved online!");
-    } catch (err) { toast("❌ Could not save settings online: " + err.message, true); }
+    localStorage.setItem("jk_settings", JSON.stringify(STORE.settings));
+    toast("✅ Settings saved!");
   }
 
   /* ---------- Password ---------- */
   async function changePass() {
-    var nw = $("newPass").value, nw2 = $("newPass2").value;
+    var cur = $("curPass").value, nw = $("newPass").value, nw2 = $("newPass2").value;
+    var hash = getStoredHash();
+    var curOk = hash ? (await sha256(cur)) === hash : cur === DEFAULT_PASS;
+    if (!curOk) { toast("Current password is wrong.", true); return; }
     if (nw.length < 6) { toast("New password must be at least 6 characters.", true); return; }
     if (nw !== nw2) { toast("Passwords don't match.", true); return; }
-    if (window.jkSupabase) {
-      var result = await window.jkSupabase.auth.updateUser({ password: nw });
-      if (result.error) { toast("Could not update password: " + result.error.message, true); return; }
-    } else {
-      localStorage.setItem("jk_admin_hash", await sha256(nw));
-    }
-    $("newPass").value = $("newPass2").value = "";
+    localStorage.setItem("jk_admin_hash", await sha256(nw));
+    $("curPass").value = $("newPass").value = $("newPass2").value = "";
     toast("🔑 Password updated!");
   }
 
@@ -338,13 +374,11 @@
   }
 
   /* ---------- Init ---------- */
-  async function init() {
-    var session = window.jkSupabase ? (await window.jkSupabase.auth.getSession()).data.session : null;
-    if (session) { sessionStorage.setItem("jk_admin_ok", "1"); await showDash(); }
-    else showLogin();
+  function init() {
+    if (sessionStorage.getItem("jk_admin_ok")) showDash(); else showLogin();
     initTabs();
-    $("loginBtn").addEventListener("click", function () { tryLogin($("loginEmail").value.trim(), $("loginPass").value); });
-    $("loginPass").addEventListener("keydown", function (e) { if (e.key === "Enter") tryLogin($("loginEmail").value.trim(), $("loginPass").value); });
+    $("loginBtn").addEventListener("click", function () { tryLogin($("loginPass").value); });
+    $("loginPass").addEventListener("keydown", function (e) { if (e.key === "Enter") tryLogin($("loginPass").value); });
     $("logoutBtn").addEventListener("click", logout);
     $("saveBtn").addEventListener("click", saveProduct);
     $("resetFormBtn").addEventListener("click", resetForm);
@@ -352,7 +386,17 @@
     $("changePassBtn").addEventListener("click", changePass);
     $("exportBtn").addEventListener("click", exportData);
     $("imgDrop").addEventListener("click", function () { $("fImgFile").click(); });
-    $("fImgFile").addEventListener("change", function (e) { if (e.target.files.length) handleFile(e.target.files[0]); });
+    $("fImgFile").addEventListener("change", function (e) { if (e.target.files.length) openCropper(e.target.files[0]); e.target.value = ""; });
+    $("cropCancel").addEventListener("click", function () { $("cropBackdrop").classList.add("hidden"); });
+    $("cropApply").addEventListener("click", applyCrop);
+    $("cropReset").addEventListener("click", resetCrop);
+    $("cropZoom").addEventListener("input", function () { cropState.zoom = Number(this.value); drawCrop(); });
+    $("cropCanvas").addEventListener("pointerdown", handleCropPointerDown);
+    $("cropCanvas").addEventListener("pointermove", handleCropPointerMove);
+    $("cropCanvas").addEventListener("pointerup", handleCropPointerUp);
+    $("cropCanvas").addEventListener("pointercancel", handleCropPointerUp);
+    $("logoDrop").addEventListener("click", function () { $("sLogoFile").click(); });
+    $("sLogoFile").addEventListener("change", function (e) { if (e.target.files.length) handleLogoFile(e.target.files[0]); e.target.value = ""; });
     // paste an image URL straight into the form? Support drag & drop:
     ["dragover", "drop"].forEach(function (ev) {
       $("imgDrop").addEventListener(ev, function (e) {

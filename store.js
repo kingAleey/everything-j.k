@@ -14,32 +14,9 @@
   var PRODUCTS = SAVED_PRODUCTS || (window.JK_PRODUCTS || []);
   var SETTINGS = Object.assign({}, window.JK_SETTINGS || {}, SAVED_SETTINGS || {});
   var CATEGORIES = ["All"];
+  PRODUCTS.forEach(function (p) { if (CATEGORIES.indexOf(p.category) < 0) CATEGORIES.push(p.category); });
   var activeCat = "All";
   var cart = loadCart();
-
-  async function loadRemoteData() {
-    if (!window.jkSupabase) return;
-    try {
-      var pr = await window.jkSupabase.from("products").select("*").order("updated_at", { ascending: false });
-      if (!pr.error && Array.isArray(pr.data) && pr.data.length) {
-        PRODUCTS = pr.data.map(function (p) {
-          return { id:p.id, name:p.name, category:p.category, price:Number(p.price)||0, oldPrice:p.old_price == null ? null : Number(p.old_price), status:p.status, image:p.image, desc:p.description || "" };
-        });
-      }
-      var sr = await window.jkSupabase.from("shop_settings").select("*").eq("id", 1).maybeSingle();
-      if (!sr.error && sr.data) {
-        SETTINGS = {
-          shopName:sr.data.shop_name, tagline:sr.data.tagline, announcement:sr.data.announcement,
-          instagram:sr.data.instagram, tiktok:sr.data.tiktok, email:sr.data.email, whatsapp:sr.data.whatsapp,
-          location:sr.data.location, deliveryNote:sr.data.delivery_note
-        };
-      }
-    } catch (e) {
-      console.warn("Supabase unavailable; using local/seed data.", e);
-    }
-    CATEGORIES = ["All"];
-    PRODUCTS.forEach(function (p) { if (CATEGORIES.indexOf(p.category) < 0) CATEGORIES.push(p.category); });
-  }
 
   /* ---------- Helpers ---------- */
   function $(id) { return document.getElementById(id); }
@@ -351,6 +328,30 @@
     $("announceBar").innerHTML = '<i>✨</i> ' + esc(SETTINGS.announcement || "");
     $("heroShopName").textContent = SETTINGS.shopName || "J&K";
     $("heroTagline").textContent = SETTINGS.tagline || "";
+    var heroLogo = $("heroLogo"), heroLogoWrap = $("heroLogoWrap"), heroTitle = $("heroTitle");
+    if (heroLogo && heroLogoWrap && heroTitle) {
+      if (SETTINGS.heroLogo) {
+        heroLogo.src = SETTINGS.heroLogo;
+        heroLogoWrap.className = "hero-logo-wrap logo-anim-" + (SETTINGS.heroLogoAnimation || "fade");
+        heroLogoWrap.classList.remove("hidden");
+        heroTitle.classList.add("has-custom-logo");
+      } else {
+        heroLogoWrap.className = "hero-logo-wrap hidden";
+        heroTitle.classList.remove("has-custom-logo");
+      }
+    }
+    var heroLogo = $("heroLogo"), heroLogoWrap = $("heroLogoWrap"), heroTitle = $("heroTitle");
+    if (heroLogo && heroLogoWrap && heroTitle) {
+      if (SETTINGS.heroLogo) {
+        heroLogo.src = SETTINGS.heroLogo;
+        heroLogoWrap.className = "hero-logo-wrap " + "logo-anim-" + (SETTINGS.heroLogoAnimation || "fade");
+        heroLogoWrap.classList.remove("hidden");
+        heroTitle.classList.add("has-custom-logo");
+      } else {
+        heroLogoWrap.className = "hero-logo-wrap hidden";
+        heroTitle.classList.remove("has-custom-logo");
+      }
+    }
     $("heroLocation").textContent = SETTINGS.location || "";
     $("heroIgLink").href = "https://ig.me/m/" + encodeURIComponent(ig);
     $("heroIgLink").innerHTML = "📲 Preorder on Instagram";
@@ -390,9 +391,8 @@
   }
 
   /* ---------- Init ---------- */
-  async function init() {
+  function init() {
     $("year").textContent = new Date().getFullYear();
-    await loadRemoteData();
     renderSettings();
     renderTicker();
     renderCats();

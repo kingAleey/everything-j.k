@@ -114,3 +114,42 @@ label.flabel{display:block;font-size:.74rem;color:var(--muted);letter-spacing:.1
   .p-row{padding:.7rem}
   .img-drop{aspect-ratio:4/3}
 }
+
+/* Logo upload */
+.logo-upload{width:100%;min-height:150px;border:2px dashed rgba(34,211,238,.35);border-radius:14px;display:grid;place-items:center;color:var(--muted);font-size:.8rem;cursor:pointer;overflow:hidden;background:rgba(34,211,238,.035);transition:.2s}
+.logo-upload:hover{border-color:var(--cyan);color:var(--cyan)}
+.logo-upload img{width:100%;height:100%;max-height:190px;object-fit:contain;padding:1rem;box-sizing:border-box}
+.logo-upload .ph{text-align:center;padding:1rem}
+.logo-upload .ph b{display:block;font-size:.9rem;color:var(--text);margin-bottom:.3rem}
+
+/* Product cropper */
+.crop-backdrop{position:fixed;inset:0;z-index:1000;background:rgba(3,5,12,.82);display:grid;place-items:center;padding:14px;backdrop-filter:blur(8px)}
+.crop-modal{width:min(560px,100%);background:#0d101c;border:1px solid rgba(255,255,255,.12);border-radius:22px;box-shadow:0 30px 90px rgba(0,0,0,.55);overflow:hidden}
+.crop-head{display:flex;justify-content:space-between;align-items:center;gap:1rem;padding:1rem 1.1rem;border-bottom:1px solid rgba(255,255,255,.08)}
+.crop-head b{display:block;color:#fff;font-size:.9rem;letter-spacing:.03em}
+.crop-head small{display:block;color:var(--muted);font-size:.7rem;margin-top:.25rem}
+.crop-x{width:34px;height:34px;border-radius:50%;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.06);color:#fff;font-size:1.35rem;line-height:1;cursor:pointer}
+.crop-stage-wrap{padding:1rem;background:#080a12;display:grid;place-items:center}
+#cropCanvas{display:block;width:min(100%,420px);height:auto;aspect-ratio:10/11;touch-action:none;cursor:grab;background:#05060b;border-radius:14px}
+#cropCanvas.dragging{cursor:grabbing}
+.crop-controls{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;padding:1rem}
+.crop-controls label{display:flex;align-items:center;gap:.5rem;color:var(--muted);font-size:.75rem;flex:1;min-width:170px}
+.crop-controls input[type=range]{width:100%}
+.crop-controls .small-btn{white-space:nowrap}
+@media(max-width:640px){
+  .crop-backdrop{padding:8px}
+  .crop-modal{border-radius:18px}
+  .crop-stage-wrap{padding:.65rem}
+  .crop-controls{padding:.75rem;display:grid;grid-template-columns:1fr 1fr}
+  .crop-controls label{grid-column:1/-1}
+  .crop-controls #cropApply{grid-column:1/-1;width:100%;justify-content:center}
+}
+
+/* Hide the bottom-center toast container from the admin dashboard as well. */
+.toast,
+.toast.show,
+.toast.error{
+  display:none !important;
+  visibility:hidden !important;
+  pointer-events:none !important;
+}
