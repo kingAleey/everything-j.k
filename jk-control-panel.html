@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>Admin, Everything J&K Store Manager</title>
+<title>Admin — Everything J&K Store Manager</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;800;900&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -23,7 +23,7 @@
   <div class="login-card">
     <div class="lock">🔐</div>
     <h1>EVERYTHING <span class="grad-text">J&K</span></h1>
-    <p class="sub">Admin Control Panel, sign in to manage your store</p>
+    <p class="sub">Admin Control Panel — sign in to manage your store</p>
     <input type="email" id="loginEmail" class="admin-input" placeholder="Admin email" autocomplete="username">
     <input type="password" id="loginPass" class="admin-input" placeholder="Enter admin password" autocomplete="current-password">
     <div class="login-err" id="loginErr"></div>
@@ -35,7 +35,7 @@
 <!-- DASHBOARD -->
 <div class="admin-shell hidden" id="dashView">
   <div class="admin-top">
-    <h1>⚙ <span>EVERYTHING J&K</span> - STORE MANAGER</h1>
+    <h1>⚙ <span>EVERYTHING J&K</span> — STORE MANAGER</h1>
     <div class="actions">
       <a href="index.html" class="small-btn">🛍 View Store</a>
       <button class="small-btn green" id="exportBtn">⬇ Export backup</button>
@@ -46,6 +46,7 @@
   <div class="tabs">
     <button class="tab active" data-tab="products">🛒 Products</button>
     <button class="tab" data-tab="settings">🎨 Store Settings</button>
+    <button class="tab" data-tab="security">🔑 Security</button>
     <button class="tab" data-tab="help">❓ Help</button>
   </div>
 
@@ -92,7 +93,7 @@
         </div>
       </div>
       <div class="panel">
-        <h2>PRODUCTS <span class="hint">(id - name - price - status)</span></h2>
+        <h2>PRODUCTS <span class="hint">(id — name — price — status)</span></h2>
         <div id="productList"></div>
       </div>
     </div>
@@ -143,16 +144,31 @@
     </div>
   </div>
 
+  <!-- SECURITY -->
+  <div class="tab-pane" id="tab-security">
+    <div class="panel" style="max-width:520px">
+      <h2>CHANGE PASSWORD</h2>
+      <label class="flabel">Current password</label>
+      <input type="password" class="admin-input" id="curPass">
+      <label class="flabel">New password (min 6 characters)</label>
+      <input type="password" class="admin-input" id="newPass">
+      <label class="flabel">Confirm new password</label>
+      <input type="password" class="admin-input" id="newPass2">
+      <button class="glow-btn btn-primary" id="changePassBtn" style="margin-top:1.4rem">🔑 Update Password</button>
+      <p style="color:var(--muted);font-size:.78rem;margin-top:1rem">Your password is managed by Supabase Auth. Use a strong unique password and change it here when needed.</p>
+    </div>
+  </div>
+
   <!-- HELP -->
   <div class="tab-pane" id="tab-help">
     <div class="panel">
       <h2>HOW TO USE THE ADMIN PANEL</h2>
       <p style="color:var(--muted);font-size:.9rem;line-height:1.8">
-        <b style="color:#fff">1. Add / edit products</b> - fill the form, click <b style="color:var(--green)">Save Product</b>.<br>
-        <b style="color:#fff">2. Pictures</b> - click the dashed box to upload; images are auto-compressed. You can also paste any image URL into the <i>name</i> field's place, no wait, use the upload box.<br>
-        <b style="color:#fff">3. Price 0</b> -shows "Price on DM 💬" on the store. Perfect for preorders.<br>
-        <b style="color:#fff">4. Save globally</b> - product and settings changes are saved to the shared Supabase database and appear on the live store for everyone. No data.js replacement is required.<br>
-        <b style="color:#fff">5. Checkout</b> - customers' carts redirect to your Instagram DM with the order summary copied. 💌
+        <b style="color:#fff">1. Add / edit products</b> — fill the form, click <b style="color:var(--green)">Save Product</b>.<br>
+        <b style="color:#fff">2. Pictures</b> — click the dashed box to upload; images are auto-compressed. You can also paste any image URL into the <i>name</i> field's place — no wait, use the upload box.<br>
+        <b style="color:#fff">3. Price 0</b> — shows "Price on DM 💬" on the store. Perfect for preorders.<br>
+        <b style="color:#fff">4. Save globally</b> — product and settings changes are saved to the shared Supabase database and appear on the live store for everyone. No data.js replacement is required.<br>
+        <b style="color:#fff">5. Checkout</b> — customers' carts redirect to your Instagram DM with the order summary copied. 💌
       </p>
     </div>
   </div>

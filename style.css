@@ -2604,3 +2604,30 @@ body.announce-dismissed .announce{
     opacity:1 !important;
   }
 }
+
+/* =====================================================
+   REQUESTED CART POPUP POSITION FIX
+   Keep the existing mobile cart popup below the sticky header.
+   ===================================================== */
+@media(max-width:900px){
+  .cart-drawer{
+    top:82px !important;
+    bottom:12px !important;
+    left:50% !important;
+    right:auto !important;
+    height:auto !important;
+    max-height:none !important;
+    transform:translateX(-50%) scale(.96) !important;
+  }
+
+  .cart-drawer.open{
+    transform:translateX(-50%) scale(1) !important;
+  }
+}
+
+@media(max-width:420px){
+  .cart-drawer{
+    top:78px !important;
+    bottom:9px !important;
+  }
+}
