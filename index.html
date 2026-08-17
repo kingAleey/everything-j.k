@@ -86,6 +86,12 @@
         <div class="sec-kicker">// The Collection</div>
         <h2>Latest <span class="grad-text">Drops</span></h2>
       </div>
+      <div class="drop-search" role="search">
+        <label class="sr-only" for="dropSearch">Search products</label>
+        <input id="dropSearch" type="search" list="dropSearchSuggestions" placeholder="Search products or category..." autocomplete="off">
+        <datalist id="dropSearchSuggestions"></datalist>
+        <button type="button" id="dropSearchBtn" aria-label="Search products">🔎 Search</button>
+      </div>
       <span class="result-count" id="resultCount"></span>
     </div>
     <div class="cards" id="productGrid"></div>
