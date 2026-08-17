@@ -2561,3 +2561,46 @@ body.announce-dismissed .announce{
   visibility:hidden !important;
   pointer-events:none !important;
 }
+
+
+/* =====================================================
+   REQUESTED POPUP POSITION / MOBILE CHECKOUT CLOSE
+   Only lowers existing popups below the header and keeps
+   the existing checkout close button visible on phones.
+   ===================================================== */
+.modal-backdrop{
+  align-items:flex-start !important;
+  padding:82px 1rem 1rem !important;
+}
+.modal{
+  position:relative !important;
+  max-height:calc(100dvh - 98px) !important;
+}
+.modal-close{
+  position:absolute !important;
+  top:1rem !important;
+  right:1rem !important;
+  z-index:20 !important;
+}
+
+@media(max-width:900px){
+  .modal-backdrop{
+    padding:76px 10px 12px !important;
+  }
+  .modal{
+    max-height:calc(100dvh - 88px) !important;
+  }
+  .modal-close{
+    top:.7rem !important;
+    right:.7rem !important;
+    width:40px !important;
+    height:40px !important;
+    min-width:40px !important;
+    min-height:40px !important;
+    display:flex !important;
+    align-items:center !important;
+    justify-content:center !important;
+    visibility:visible !important;
+    opacity:1 !important;
+  }
+}
